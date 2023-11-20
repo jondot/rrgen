@@ -1,5 +1,6 @@
 use std::{collections::HashMap, hash::BuildHasher};
 
+use cruet::string::pluralize;
 use heck::{ToKebabCase, ToLowerCamelCase, ToSnakeCase, ToTitleCase, ToUpperCamelCase};
 use tera::{to_value, try_get_value, Result, Tera, Value};
 
@@ -12,6 +13,12 @@ pub fn register_all(tera: &mut Tera) {
     tera.register_filter("snake_case", snake_case);
     tera.register_filter("title_case", title_case);
     tera.register_filter("upper_case", upper_case);
+    tera.register_filter("pluralize", pluralize);
+}
+
+pub fn pluralize<S: BuildHasher>(value: &Value, _: &HashMap<String, Value, S>) -> Result<Value> {
+    let s = try_get_value!("pluralize", "value", String, value);
+    Ok(to_value(pluralize::to_plural(&s)).unwrap())
 }
 
 /// Converts text into `PascalCase`.
