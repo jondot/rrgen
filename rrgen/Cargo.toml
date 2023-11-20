@@ -5,6 +5,13 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+description = "A microframework for declarative code generation and injection"
+authors = ["Dotan Nahum <dotan@rng0.io>"]
+documentation = "https://docs.rs/rrgen"
+repository = "https://github.com/jondot/rrgen"
+keywords = ["codegen", "template"]
+license = "Apache-2.0"
+readme = "../README.md"
 
 [dependencies]
 
