@@ -2,7 +2,7 @@
 use std::fs;
 
 use fs_extra::{self, dir::CopyOptions};
-use rrgen::Rgen;
+use rrgen::RRgen;
 use serde_json::json;
 
 #[test]
@@ -21,7 +21,7 @@ fn test_generate() {
         },
     )
     .unwrap();
-    let rgen = Rgen::default();
+    let rgen = RRgen::default();
 
     rgen.generate(
         &fs::read_to_string("tests/fixtures/test1/template.t").unwrap(),
@@ -47,7 +47,7 @@ fn test_realistic() {
         },
     )
     .unwrap();
-    let rgen = Rgen::default();
+    let rgen = RRgen::default();
 
     rgen.generate(
         &fs::read_to_string("tests/fixtures/realistic/controller.t").unwrap(),

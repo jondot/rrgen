@@ -106,12 +106,12 @@ pub enum Error {
 }
 type Result<T> = std::result::Result<T, Error>;
 
-pub struct Rgen {
+pub struct RRgen {
     fs: Box<dyn FsDriver>,
     printer: Box<dyn Printer>,
 }
 
-impl Default for Rgen {
+impl Default for RRgen {
     fn default() -> Self {
         Self {
             fs: Box::new(RealFsDriver {}),
@@ -120,7 +120,7 @@ impl Default for Rgen {
     }
 }
 
-impl Rgen {
+impl RRgen {
     /// Generate from a template contained in `input`
     ///
     /// # Errors
