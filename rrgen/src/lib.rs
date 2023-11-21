@@ -1,6 +1,5 @@
 use std::path::Path;
 
-use gray_matter::{engine::YAML, Matter};
 use regex::Regex;
 use serde::Deserialize;
 use tera::{Context, Tera};
@@ -102,10 +101,19 @@ pub enum Error {
     #[error(transparent)]
     Serde(#[from] serde_json::Error),
     #[error(transparent)]
+    YAML(#[from] serde_yaml::Error),
+    #[error(transparent)]
     Any(Box<dyn std::error::Error + Send + Sync>),
 }
 type Result<T> = std::result::Result<T, Error>;
 
+fn parse_template(input: &str) -> Result<(FrontMatter, String)> {
+    let (fm, body) = input.split_once("---\n").ok_or_else(|| {
+        Error::Message("cannot split document to frontmatter and body".to_string())
+    })?;
+    let frontmatter: FrontMatter = serde_yaml::from_str(fm)?;
+    Ok((frontmatter, body.to_string()))
+}
 pub struct RRgen {
     fs: Box<dyn FsDriver>,
     printer: Box<dyn Printer>,
@@ -130,16 +138,13 @@ impl RRgen {
         let mut tera = Tera::default();
         tera_filters::register_all(&mut tera);
         let rendered = tera.render_str(input, &Context::from_serialize(vars.clone())?)?;
-        let matter = Matter::<YAML>::new();
-        let parsed = matter.parse(&rendered);
-        let frontmatter: FrontMatter = parsed
-            .data
-            .ok_or_else(|| Error::Message("cannot find frontmatter".to_string()))?
-            .deserialize()?;
+        println!("rendered:\n{}", rendered);
+        let (frontmatter, body) = parse_template(&rendered)?;
         let path_to = Path::new(&frontmatter.to);
 
+        println!("body:\n{}\n---", body);
         // write main file
-        self.fs.write_file(path_to, &parsed.content)?;
+        self.fs.write_file(path_to, &body)?;
         if self.fs.exists(path_to) {
             self.printer.overwrite_file(path_to);
         } else {

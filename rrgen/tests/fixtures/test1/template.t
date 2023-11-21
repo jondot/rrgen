@@ -1,4 +1,4 @@
----
+{% set something = 1 -%}
 to: tests/fixtures/test1/generated/{{name}}.txt
 injections:
 - into: tests/fixtures/test1/generated/prepend.txt

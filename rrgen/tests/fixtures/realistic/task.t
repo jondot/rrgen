@@ -1,4 +1,3 @@
----
 to: tests/fixtures/realistic/generated/tasks/{{name | snake_case }}.rs
 injections:
 - into: tests/fixtures/realistic/generated/tasks/mod.rs

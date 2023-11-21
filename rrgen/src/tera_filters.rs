@@ -13,10 +13,10 @@ pub fn register_all(tera: &mut Tera) {
     tera.register_filter("snake_case", snake_case);
     tera.register_filter("title_case", title_case);
     tera.register_filter("upper_case", upper_case);
-    tera.register_filter("pluralize", pluralize);
+    tera.register_filter("plural", plural);
 }
 
-pub fn pluralize<S: BuildHasher>(value: &Value, _: &HashMap<String, Value, S>) -> Result<Value> {
+pub fn plural<S: BuildHasher>(value: &Value, _: &HashMap<String, Value, S>) -> Result<Value> {
     let s = try_get_value!("pluralize", "value", String, value);
     Ok(to_value(pluralize::to_plural(&s)).unwrap())
 }

@@ -1,4 +1,3 @@
----
 to: tests/fixtures/realistic/generated/controllers/{{name | snake_case }}.rs
 injections:
 - into: tests/fixtures/realistic/generated/controllers/mod.rs
