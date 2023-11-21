@@ -74,6 +74,9 @@ struct FrontMatter {
     skip_glob: Option<String>,
 
     #[serde(default)]
+    message: Option<String>,
+
+    #[serde(default)]
     injections: Option<Vec<Injection>>,
 }
 
@@ -128,6 +131,11 @@ pub enum Error {
 }
 type Result<T> = std::result::Result<T, Error>;
 
+pub enum GenResult {
+    Skipped,
+    Generated { message: Option<String> },
+}
+
 fn parse_template(input: &str) -> Result<(FrontMatter, String)> {
     let (fm, body) = input.split_once("---\n").ok_or_else(|| {
         Error::Message("cannot split document to frontmatter and body".to_string())
@@ -155,7 +163,7 @@ impl RRgen {
     /// # Errors
     ///
     /// This function will return an error if operation fails
-    pub fn generate(&self, input: &str, vars: &serde_json::Value) -> Result<()> {
+    pub fn generate(&self, input: &str, vars: &serde_json::Value) -> Result<GenResult> {
         let mut tera = Tera::default();
         tera_filters::register_all(&mut tera);
         let rendered = tera.render_str(input, &Context::from_serialize(vars.clone())?)?;
@@ -164,12 +172,12 @@ impl RRgen {
 
         if frontmatter.skip_exists && self.fs.exists(path_to) {
             self.printer.skip_exists(path_to);
-            return Ok(());
+            return Ok(GenResult::Skipped);
         }
         if let Some(skip_glob) = frontmatter.skip_glob {
             if glob::glob(&skip_glob)?.count() > 0 {
                 self.printer.skip_exists(path_to);
-                return Ok(());
+                return Ok(GenResult::Skipped);
             }
         }
 
@@ -242,6 +250,8 @@ impl RRgen {
                 self.printer.injected(injection_to);
             }
         }
-        Ok(())
+        Ok(GenResult::Generated {
+            message: frontmatter.message.clone(),
+        })
     }
 }
