@@ -824,6 +824,7 @@ dependencies = [
  "dir-diff",
  "fs-err",
  "fs_extra",
+ "glob",
  "heck",
  "insta",
  "regex",

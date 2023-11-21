@@ -14,9 +14,15 @@ injections:
 - into: tests/fixtures/test1/generated/before.txt
   content: "// doc comment"
   before: "pub class"
+- into: tests/fixtures/test1/generated/before_last.txt
+  content: "before-last"
+  before_last: "\\]"
 - into: tests/fixtures/test1/generated/after.txt
   content: "field: integer"
   after: "pub class"
+- into: tests/fixtures/test1/generated/after_last.txt
+  content: "field: integer"
+  after_last: "\\{"
 ---
 
 hello, this is the file body.

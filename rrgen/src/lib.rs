@@ -40,6 +40,7 @@ impl FsDriver for RealFsDriver {
 
 pub trait Printer {
     fn overwrite_file(&self, file_to: &Path);
+    fn skip_exists(&self, file_to: &Path);
     fn add_file(&self, file_to: &Path);
     fn injected(&self, file_to: &Path);
 }
@@ -56,11 +57,21 @@ impl Printer for ConsolePrinter {
     fn injected(&self, file_to: &Path) {
         println!("injected: {file_to:?}");
     }
+
+    fn skip_exists(&self, file_to: &Path) {
+        println!("skipped (exists): {file_to:?}");
+    }
 }
 
 #[derive(Deserialize, Debug, Default)]
 struct FrontMatter {
     to: String,
+
+    #[serde(default)]
+    skip_exists: bool,
+
+    #[serde(default)]
+    skip_glob: Option<String>,
 
     #[serde(default)]
     injections: Option<Vec<Injection>>,
@@ -81,7 +92,15 @@ struct Injection {
 
     #[serde(with = "serde_regex")]
     #[serde(default)]
+    before_last: Option<Regex>,
+
+    #[serde(with = "serde_regex")]
+    #[serde(default)]
     after: Option<Regex>,
+
+    #[serde(with = "serde_regex")]
+    #[serde(default)]
+    after_last: Option<Regex>,
 
     #[serde(default)]
     prepend: bool,
@@ -102,6 +121,8 @@ pub enum Error {
     Serde(#[from] serde_json::Error),
     #[error(transparent)]
     YAML(#[from] serde_yaml::Error),
+    #[error(transparent)]
+    Glob(#[from] glob::PatternError),
     #[error(transparent)]
     Any(Box<dyn std::error::Error + Send + Sync>),
 }
@@ -138,18 +159,27 @@ impl RRgen {
         let mut tera = Tera::default();
         tera_filters::register_all(&mut tera);
         let rendered = tera.render_str(input, &Context::from_serialize(vars.clone())?)?;
-        println!("rendered:\n{}", rendered);
         let (frontmatter, body) = parse_template(&rendered)?;
         let path_to = Path::new(&frontmatter.to);
 
-        println!("body:\n{}\n---", body);
-        // write main file
-        self.fs.write_file(path_to, &body)?;
+        if frontmatter.skip_exists && self.fs.exists(path_to) {
+            self.printer.skip_exists(path_to);
+            return Ok(());
+        }
+        if let Some(skip_glob) = frontmatter.skip_glob {
+            if glob::glob(&skip_glob)?.count() > 0 {
+                self.printer.skip_exists(path_to);
+                return Ok(());
+            }
+        }
+
         if self.fs.exists(path_to) {
             self.printer.overwrite_file(path_to);
         } else {
             self.printer.add_file(path_to);
         }
+        // write main file
+        self.fs.write_file(path_to, &body)?;
 
         // handle injects
         if let Some(injections) = frontmatter.injections {
@@ -182,9 +212,23 @@ impl RRgen {
                         lines.insert(pos, content);
                     }
                     lines.join("\n")
+                } else if let Some(before_last) = &injection.before_last {
+                    let mut lines = file_content.lines().collect::<Vec<_>>();
+                    let pos = lines.iter().rposition(|ln| before_last.is_match(ln));
+                    if let Some(pos) = pos {
+                        lines.insert(pos, content);
+                    }
+                    lines.join("\n")
                 } else if let Some(after) = &injection.after {
                     let mut lines = file_content.lines().collect::<Vec<_>>();
                     let pos = lines.iter().position(|ln| after.is_match(ln));
+                    if let Some(pos) = pos {
+                        lines.insert(pos + 1, content);
+                    }
+                    lines.join("\n")
+                } else if let Some(after_last) = &injection.after_last {
+                    let mut lines = file_content.lines().collect::<Vec<_>>();
+                    let pos = lines.iter().rposition(|ln| after_last.is_match(ln));
                     if let Some(pos) = pos {
                         lines.insert(pos + 1, content);
                     }
