@@ -26,6 +26,14 @@ pub trait FsDriver {
 pub struct RealFsDriver {}
 impl FsDriver for RealFsDriver {
     fn write_file(&self, path: &Path, content: &str) -> Result<()> {
+        let dir = if path.is_file() {
+            path.parent().expect("cannot get folder")
+        } else {
+            path
+        };
+        if !dir.exists() {
+            fs_err::create_dir_all(dir)?;
+        }
         Ok(fs_err::write(path, content)?)
     }
 
