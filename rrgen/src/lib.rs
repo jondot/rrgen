@@ -109,6 +109,10 @@ struct Injection {
     #[serde(default)]
     after_last: Option<Regex>,
 
+    #[serde(with = "serde_regex")]
+    #[serde(default)]
+    remove_lines: Option<Regex>,
+
     #[serde(default)]
     prepend: bool,
 
@@ -244,6 +248,12 @@ impl RRgen {
                     if let Some(pos) = pos {
                         lines.insert(pos + 1, content);
                     }
+                    lines.join("\n")
+                } else if let Some(remove_lines) = &injection.remove_lines {
+                    let lines = file_content
+                        .lines()
+                        .filter(|line| !remove_lines.is_match(line))
+                        .collect::<Vec<_>>();
                     lines.join("\n")
                 } else {
                     println!("warning: no injection made");

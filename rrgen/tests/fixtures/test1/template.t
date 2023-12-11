@@ -23,6 +23,9 @@ injections:
 - into: tests/fixtures/test1/generated/after_last.txt
   content: "field: integer"
   after_last: "\\{"
+- into: tests/fixtures/test1/generated/remove_lines.txt
+  content: ""
+  remove_lines: "Delete this line"
 ---
 
 hello, this is the file body.
