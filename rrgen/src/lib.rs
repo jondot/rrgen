@@ -4,6 +4,20 @@ use regex::Regex;
 use serde::Deserialize;
 use tera::{Context, Tera};
 
+use std::fmt;
+
+struct PartsDisplay<'a>(&'a Vec<&'a str>);
+
+// Implement Display for PartsDisplay
+impl<'a> fmt::Display for PartsDisplay<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for (i, part) in self.0.iter().enumerate() {
+            write!(f, "Part {}: {}\n", i, part)?;
+        }
+        Ok(())
+    }
+}
+
 mod tera_filters;
 pub trait FsDriver {
     /// Write a file
@@ -145,9 +159,13 @@ pub enum GenResult {
 }
 
 fn parse_template(input: &str) -> Result<(FrontMatter, String)> {
-    let (fm, body) = input.split_once("---\n").ok_or_else(|| {
-        Error::Message("cannot split document to frontmatter and body".to_string())
-    })?;
+    let parts: Vec<&str>  = input.split("---").collect();
+    let parts_display = PartsDisplay(&parts);
+    println!("{}", parts_display);
+    if parts.len() < 2 {
+        return Err(Error::Message("cannot split document to frontmatter and body".to_string()));
+    }
+    let (fm, body) = (parts[0], parts[1]);
     let frontmatter: FrontMatter = serde_yaml::from_str(fm)?;
     Ok((frontmatter, body.to_string()))
 }
