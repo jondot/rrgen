@@ -27,7 +27,6 @@ injections:
   content: ""
   remove_lines: "Delete this line"
 ---
-
 hello, this is the file body.
 
 variable: {{ name | pascal_case }}
