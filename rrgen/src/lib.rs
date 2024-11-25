@@ -1,10 +1,23 @@
+#[cfg(all(feature = "tera", feature = "minijinja"))]
+compile_error!("You cannot enable both 'tera' and 'minijinja' at the same time.");
+
+#[cfg(not(any(feature = "tera", feature = "minijinja")))]
+compile_error!("You must enable exactly one feature: 'tera' or 'minijinja'.");
+
 use std::path::Path;
 
 use regex::Regex;
 use serde::Deserialize;
+#[cfg(feature = "tera")]
 use tera::{Context, Tera};
+#[cfg(feature = "minijinja")]
+use minijinja::{context, Environment};
 
+#[cfg(feature = "tera")]
 mod tera_filters;
+#[cfg(feature = "minijinja")]
+mod minijinja_filters;
+
 pub trait FsDriver {
     /// Write a file
     ///
@@ -124,8 +137,12 @@ struct Injection {
 pub enum Error {
     #[error("{0}")]
     Message(String),
+    #[cfg(feature = "tera")]
     #[error(transparent)]
     Tera(#[from] tera::Error),
+    #[cfg(feature = "minijinja")]
+    #[error(transparent)]
+    MiniJinja(#[from] minijinja::Error),
     #[error(transparent)]
     IO(#[from] std::io::Error),
     #[error(transparent)]
@@ -154,13 +171,30 @@ fn parse_template(input: &str) -> Result<(FrontMatter, String)> {
 pub struct RRgen {
     fs: Box<dyn FsDriver>,
     printer: Box<dyn Printer>,
+    #[cfg(feature = "tera")]
+    pub tera: Tera,
+    #[cfg(feature = "minijinja")]
+    pub minijinja: Environment,
 }
 
 impl Default for RRgen {
     fn default() -> Self {
+        #[cfg(feature = "tera")]{
+            let mut tera = Tera::default();
+            tera_filters::register_all(&mut tera);
+        }
+        #[cfg(feature = "minijinja")]{
+            let mut minijinja = Environment::new();
+            minijinja_filters::register_all(&mut minijinja);
+        }
+
         Self {
             fs: Box::new(RealFsDriver {}),
             printer: Box::new(ConsolePrinter {}),
+            #[cfg(feature = "tera")]
+            tera: tera,
+            #[cfg(feature = "minijinja")]
+            minijinja
         }
     }
 }
@@ -171,10 +205,15 @@ impl RRgen {
     /// # Errors
     ///
     /// This function will return an error if operation fails
-    pub fn generate(&self, input: &str, vars: &serde_json::Value) -> Result<GenResult> {
-        let mut tera = Tera::default();
-        tera_filters::register_all(&mut tera);
-        let rendered = tera.render_str(input, &Context::from_serialize(vars.clone())?)?;
+    pub fn generate(&mut self, input: &str, vars: &serde_json::Value) -> Result<GenResult> {
+        #[cfg(feature = "tera")]
+        let rendered = self.tera.render_str(input, &Context::from_serialize(vars.clone())?)?;
+        #[cfg(feature = "minijinja")]
+        let rendered = self.minijinja.render_str(input,vars.clone())?;
+        self.handle_rendered(rendered)
+    }
+
+    fn handle_rendered(&self, rendered:String) -> Result<GenResult> {
         let (frontmatter, body) = parse_template(&rendered)?;
         let path_to = Path::new(&frontmatter.to);
 
@@ -198,7 +237,14 @@ impl RRgen {
         self.fs.write_file(path_to, &body)?;
 
         // handle injects
-        if let Some(injections) = frontmatter.injections {
+        self.handle_injects(frontmatter.injections,frontmatter.message.clone())?;
+        Ok(GenResult::Generated {
+            message: frontmatter.message.clone(),
+        })
+
+    }
+    fn handle_injects(&self, injections: Option<Vec<Injection>>, message:Option<String>) -> Result<GenResult> {
+        if let Some(injections) = injections {
             for injection in &injections {
                 let injection_to = Path::new(&injection.into);
                 if !self.fs.exists(injection_to) {
@@ -263,9 +309,75 @@ impl RRgen {
                 self.fs.write_file(injection_to, &new_content)?;
                 self.printer.injected(injection_to);
             }
+            Ok(GenResult::Generated {
+                message: message.clone(),
+            })
+        }else {
+            Ok(GenResult::Skipped)
         }
-        Ok(GenResult::Generated {
-            message: frontmatter.message.clone(),
-        })
+    }
+
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_template() {
+        let input = r#"
+---
+to: file1.txt
+message: "File file1.txt was created successfully."
+---
+print some content #1
+---
+to: file2.txt
+message: "File file2.txt was created successfully."
+---
+print some content #2
+"#;
+
+        let expected = vec![
+            (
+                FrontMatter {
+                    to: "file1.txt".to_string(),
+                    skip_exists: false,
+                    skip_glob: None,
+                    message: Some("File file1.txt was created successfully.".to_string()),
+                    injections: None,
+                },
+                "print some content".to_string(),
+            ),
+            (
+                FrontMatter {
+                    to: "file2.txt".to_string(),
+                    skip_exists: false,
+                    skip_glob: None,
+                    message: Some("File file2.txt was created successfully.".to_string()),
+                    injections: None,
+                },
+                "print some content2".to_string(),
+            ),
+        ];
+
+        let parsed_data = parse_template(input).unwrap();
+        assert_eq!(parsed_data, expected);
+    }
+
+    #[test]
+    fn test_parse_template_with_error() {
+        let input = r#"
+---
+to: ./file1.txt
+message: "File file1.txt was created successfully."
+---
+print some content
+--- incomplete header
+"#;
+
+        let result = parse_template(input);
+        assert!(result.is_err());
     }
 }

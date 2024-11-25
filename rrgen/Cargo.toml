@@ -13,9 +13,13 @@ keywords = ["codegen", "template"]
 license = "Apache-2.0"
 readme = "../README.md"
 
-[dependencies]
+[features]
+default = ["tera"]
+tera = ["dep:tera"]
+minijinja = ["dep:minijinja"]
 
-tera = "1"
+[dependencies]
+tera = { version = "1", optional = true }
 heck = "0.4.1"
 cruet = "0.13.3"
 thiserror = "1"
@@ -26,6 +30,7 @@ regex = "1"
 serde_regex = "1.1.0"
 fs-err = "2.10.0"
 glob = "0.3.1"
+minijinja = { version = "2.5.0", features = ["default", "adjacent_loop_items"], optional = true }
 
 [dev-dependencies]
 insta = "1"
