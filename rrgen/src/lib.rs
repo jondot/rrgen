@@ -145,6 +145,9 @@ pub enum GenResult {
 }
 
 fn parse_template(input: &str) -> Result<(FrontMatter, String)> {
+    // normalize line endings
+    let input = input.replace("\r\n", "\n");
+
     let (fm, body) = input.split_once("---\n").ok_or_else(|| {
         Error::Message("cannot split document to frontmatter and body".to_string())
     })?;
