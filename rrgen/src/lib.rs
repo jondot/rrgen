@@ -225,8 +225,8 @@ impl RRgen {
     ///
     /// This function will return an error if operation fails
     pub fn generate(&mut self, input: &str, vars: &serde_json::Value) -> Result<GenResult> {
-        debug!("input: {input:?}");
-        debug!("vars: {vars:?}");
+        debug!("generating from template: {input:?}");
+        debug!("template vars: {:?}", serde_json::to_string(&vars)?);
         #[cfg(feature = "tera")]{
             let rendered = self.tera.render_str(input, &Context::from_serialize(vars.clone())?)?;
             debug!("rendered: {rendered:?}");
@@ -234,7 +234,6 @@ impl RRgen {
         }
         #[cfg(feature = "minijinja")]{
             let rendered = self.minijinja.render_str(input, vars.clone())?;
-            debug!("rendered: {rendered:?}");
             self.handle_rendered(rendered)
         }
     }
@@ -245,8 +244,9 @@ impl RRgen {
     ///
     /// This function will return an error if operation fails
     pub fn generate_by_template_with_name(&mut self, name: &str, vars: &serde_json::Value) -> Result<GenResult> {
-        debug!("name: {name:?}");
-        debug!("vars: {vars:?}");
+        debug!("generating from template with name: {name:?}, vars: {:?}",serde_json::to_string(&vars)?);
+        let pretty_vars = serde_json::to_string(&vars)?;
+
         #[cfg(feature = "tera")]{
             let rendered = self.tera.render_str(name, &Context::from_serialize(vars.clone())?)?;
             debug!("rendered: {rendered:?}");
@@ -256,7 +256,6 @@ impl RRgen {
         #[cfg(feature = "minijinja")]{
             let template = self.minijinja.get_template(name);
             let rendered = template?.render(vars)?;
-            debug!("rendered: {rendered:?}");
             self.handle_rendered(rendered)
         }
     }
