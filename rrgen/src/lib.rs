@@ -229,11 +229,13 @@ impl RRgen {
         debug!("vars: {vars:?}");
         #[cfg(feature = "tera")]{
             let rendered = self.tera.render_str(input, &Context::from_serialize(vars.clone())?)?;
-            return self.handle_rendered(rendered);
+            debug!("rendered: {rendered:?}");
+            self.handle_rendered(rendered)
         }
         #[cfg(feature = "minijinja")]{
             let rendered = self.minijinja.render_str(input, vars.clone())?;
-            return self.handle_rendered(rendered);
+            debug!("rendered: {rendered:?}");
+            self.handle_rendered(rendered)
         }
     }
 
@@ -243,15 +245,19 @@ impl RRgen {
     ///
     /// This function will return an error if operation fails
     pub fn generate_by_template_with_name(&mut self, name: &str, vars: &serde_json::Value) -> Result<GenResult> {
+        debug!("name: {name:?}");
+        debug!("vars: {vars:?}");
         #[cfg(feature = "tera")]{
             let rendered = self.tera.render_str(name, &Context::from_serialize(vars.clone())?)?;
-            return self.handle_rendered(rendered);
+            debug!("rendered: {rendered:?}");
+            self.handle_rendered(rendered)
         }
 
         #[cfg(feature = "minijinja")]{
             let template = self.minijinja.get_template(name);
             let rendered = template?.render(vars)?;
-            return self.handle_rendered(rendered);
+            debug!("rendered: {rendered:?}");
+            self.handle_rendered(rendered)
         }
     }
 
