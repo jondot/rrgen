@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use regex::Regex;
 use serde::Deserialize;
@@ -139,6 +139,7 @@ pub enum Error {
 }
 type Result<T> = std::result::Result<T, Error>;
 
+#[derive(Debug)]
 pub enum GenResult {
     Skipped,
     Generated { message: Option<String> },
@@ -155,6 +156,7 @@ fn parse_template(input: &str) -> Result<(FrontMatter, String)> {
     Ok((frontmatter, body.to_string()))
 }
 pub struct RRgen {
+    working_dir: Option<PathBuf>,
     fs: Box<dyn FsDriver>,
     printer: Box<dyn Printer>,
 }
@@ -162,6 +164,7 @@ pub struct RRgen {
 impl Default for RRgen {
     fn default() -> Self {
         Self {
+            working_dir: None,
             fs: Box::new(RealFsDriver {}),
             printer: Box::new(ConsolePrinter {}),
         }
@@ -169,6 +172,23 @@ impl Default for RRgen {
 }
 
 impl RRgen {
+    /// Creates a new [`RRgen`] instance with the specified working directory.
+    ///
+    /// # Example
+    /// ```rust
+    /// use rrgen::RRgen;
+    ///
+    /// let rgen = RRgen::with_working_dir("path");
+    ///
+    /// ```
+    #[must_use]
+    pub fn with_working_dir<P: AsRef<Path>>(path: P) -> Self {
+        Self {
+            working_dir: Some(path.as_ref().to_path_buf()),
+            ..Default::default()
+        }
+    }
+
     /// Generate from a template contained in `input`
     ///
     /// # Errors
@@ -179,39 +199,47 @@ impl RRgen {
         tera_filters::register_all(&mut tera);
         let rendered = tera.render_str(input, &Context::from_serialize(vars.clone())?)?;
         let (frontmatter, body) = parse_template(&rendered)?;
-        let path_to = Path::new(&frontmatter.to);
 
-        if frontmatter.skip_exists && self.fs.exists(path_to) {
-            self.printer.skip_exists(path_to);
+        let path_to = if let Some(working_dir) = &self.working_dir {
+            working_dir.join(frontmatter.to)
+        } else {
+            PathBuf::from(&frontmatter.to)
+        };
+
+        if frontmatter.skip_exists && self.fs.exists(&path_to) {
+            self.printer.skip_exists(&path_to);
             return Ok(GenResult::Skipped);
         }
         if let Some(skip_glob) = frontmatter.skip_glob {
             if glob::glob(&skip_glob)?.count() > 0 {
-                self.printer.skip_exists(path_to);
+                self.printer.skip_exists(&path_to);
                 return Ok(GenResult::Skipped);
             }
         }
 
-        if self.fs.exists(path_to) {
-            self.printer.overwrite_file(path_to);
+        if self.fs.exists(&path_to) {
+            self.printer.overwrite_file(&path_to);
         } else {
-            self.printer.add_file(path_to);
+            self.printer.add_file(&path_to);
         }
         // write main file
-        self.fs.write_file(path_to, &body)?;
+        self.fs.write_file(&path_to, &body)?;
 
         // handle injects
         if let Some(injections) = frontmatter.injections {
             for injection in &injections {
-                let injection_to = Path::new(&injection.into);
-                if !self.fs.exists(injection_to) {
+                let injection_to = self.working_dir.as_ref().map_or_else(
+                    || PathBuf::from(&injection.into),
+                    |working_dir| working_dir.join(&injection.into),
+                );
+                if !self.fs.exists(&injection_to) {
                     return Err(Error::Message(format!(
                         "cannot inject into {}: file does not exist",
                         injection.into,
                     )));
                 }
 
-                let file_content = self.fs.read_file(injection_to)?;
+                let file_content = self.fs.read_file(&injection_to)?;
                 let content = &injection.content;
 
                 if let Some(skip_if) = &injection.skip_if {
@@ -263,8 +291,8 @@ impl RRgen {
                     file_content.clone()
                 };
 
-                self.fs.write_file(injection_to, &new_content)?;
-                self.printer.injected(injection_to);
+                self.fs.write_file(&injection_to, &new_content)?;
+                self.printer.injected(&injection_to);
             }
         }
         Ok(GenResult::Generated {
