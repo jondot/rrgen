@@ -195,9 +195,9 @@ pub struct RRgen {
     fs: Box<dyn FsDriver>,
     printer: Box<dyn Printer>,
     #[cfg(feature = "tera")]
-    pub tera: Tera,
+    tera: Tera,
     #[cfg(feature = "minijinja")]
-    pub minijinja: Environment<'static>,
+    minijinja: Environment<'static>,
 }
 
 impl Default for RRgen {
@@ -242,22 +242,55 @@ impl RRgen {
         }
     }
 
+    /// Creates a new `RRgen` instance with the specified templates.
+    ///
+    /// # Example
+    /// ```rust
+    /// use rrgen::RRgen;
+    /// use std::collections::HashMap;
+    ///
+    /// let templates = vec![
+    ///     ("template1", "content of template 1"),
+    ///     ("template2", "content of template 2"),
+    /// ];
+    /// let rgen = RRgen::with_templates(templates).unwrap();
+    ///
+    /// let mut map = HashMap::new();
+    /// map.insert("template3", "content of template 3");
+    /// let rgen = RRgen::with_templates(map).unwrap();
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if operation fails
+    pub fn with_templates<I>(templates: I) -> std::result::Result<Self, Error>
+    where
+        I: IntoIterator<Item = (&'static str, &'static str)>,
+    {
+        let mut rgen = RRgen::default();
+        for (name, content) in templates {
+            rgen.add_template(name, content)?;
+        }
+        Ok(rgen)
+    }
+
     /// Generate from a template contained in `input`
     ///
     /// # Errors
     ///
     /// This function will return an error if operation fails
-    pub fn generate(&mut self, input: &str, vars: &serde_json::Value) -> Result<GenResult> {
+    pub fn generate(&self, input: &str, vars: &serde_json::Value) -> Result<GenResult> {
         debug!("generating from template: {input:?}");
         debug!("template vars: {:?}", serde_json::to_string(&vars)?);
         #[cfg(feature = "tera")]{
-            let rendered = self.tera.render_str(input, &Context::from_serialize(vars.clone())?)?;
+            let mut tera = self.tera.clone();
+            let rendered = tera.render_str(input, &Context::from_serialize(vars.clone())?)?;
             debug!("rendered: {rendered:?}");
-            self.handle_rendered(rendered)
+            self.handle_rendered(rendered.as_str())
         }
         #[cfg(feature = "minijinja")]{
             let rendered = self.minijinja.render_str(input, vars.clone())?;
-            self.handle_rendered(rendered)
+            self.handle_rendered(rendered.as_str())
         }
     }
 
@@ -266,30 +299,28 @@ impl RRgen {
     /// # Errors
     ///
     /// This function will return an error if operation fails
-    pub fn generate_by_template_with_name(&mut self, name: &str, vars: &serde_json::Value) -> Result<GenResult> {
+    pub fn generate_by_template_with_name(&self, name: &str, vars: &serde_json::Value) -> Result<GenResult> {
         debug!("generating from template with name: {name:?}, vars: {:?}",serde_json::to_string(&vars)?);
-        let pretty_vars = serde_json::to_string(&vars)?;
 
         #[cfg(feature = "tera")]{
-            let rendered = self.tera.render_str(name, &Context::from_serialize(vars.clone())?)?;
+            let rendered = self.tera.render(name, &Context::from_serialize(vars.clone())?)?;
             debug!("rendered: {rendered:?}");
-            self.handle_rendered(rendered)
+            self.handle_rendered(&rendered)
         }
 
         #[cfg(feature = "minijinja")]{
             let template = self.minijinja.get_template(name);
             let rendered = template?.render(vars)?;
-            self.handle_rendered(rendered)
+            self.handle_rendered(rendered.as_str())
         }
     }
 
-    /// Add name and template in template engine
+    /// Add template with the given name in template engine
     ///
     /// # Errors
     ///
     /// This function will return an error if operation fails
-    pub fn add_template(&mut self, name: &str, template: &str) -> Result<()> {
-
+    fn add_template(&mut self, name: &str, template: &str) -> Result<()> {
         #[cfg(feature = "tera")]{
             self.tera.add_raw_template(name, template)?
         }
@@ -304,9 +335,9 @@ impl RRgen {
     /// # Errors
     ///
     /// This function will return an error if operation fails
-    fn handle_rendered(&mut self, rendered: String) -> Result<GenResult> {
+    fn handle_rendered(&self, rendered: &str) -> Result<GenResult> {
         debug!("rendered: {rendered:?}");
-        let parts = parse_template(&rendered)?;
+        let parts = parse_template(rendered)?;
         let messages: Vec<String> = parts.iter()
             .map(|(frontmatter, body)| self.handle_frontmatter_and_body(frontmatter.clone(), body.clone()))
             .collect::<Result<Vec<GenResult>>>()?
@@ -329,7 +360,7 @@ impl RRgen {
     /// # Errors
     ///
     /// This function will return an error if operation fails
-    fn handle_frontmatter_and_body(&mut self, frontmatter: FrontMatter, body: String) -> Result<GenResult> {
+    fn handle_frontmatter_and_body(&self, frontmatter: FrontMatter, body: String) -> Result<GenResult> {
         let path_to = Path::new(&frontmatter.to);
 
         let path_to = if let Some(working_dir) = &self.working_dir {
@@ -446,6 +477,84 @@ impl RRgen {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
+
+    #[cfg(feature = "tera")]
+    #[test]
+    fn test_instantiate_tera() {
+        let tera = Tera::default();
+        assert_eq!(tera.get_template_names().count(), 0);
+    }
+
+    #[cfg(feature = "tera")]
+    #[test]
+    fn test_run_template_by_name() {
+        let mut rgen = RRgen::default();
+        rgen.add_template("test_template", "Hello, {{ name }}!").unwrap();
+
+        let vars = json!({ "name": "World" });
+        let result = rgen.generate_by_template_with_name("test_template", &vars).unwrap();
+
+        if let GenResult::Generated { message } = result {
+            assert_eq!(message.unwrap(), "Hello, World!");
+        } else {
+            panic!("Template generation failed");
+        }
+    }
+
+    #[cfg(feature = "tera")]
+    #[test]
+    fn test_run_template_string() {
+        let rgen = RRgen::default();
+        let template_str = "Hello, {{ name }}!";
+        let vars = json!({ "name": "World" });
+        let result = rgen.generate(template_str, &vars).unwrap();
+
+        if let GenResult::Generated { message } = result {
+            assert_eq!(message.unwrap(), "Hello, World!");
+        } else {
+            panic!("Template generation failed");
+        }
+    }
+
+    #[cfg(feature = "minijinja")]
+    #[test]
+    fn test_instantiate_minijinja() {
+        let minijinja = Environment::new();
+        assert_eq!(minijinja.templates().count(), 0);
+    }
+
+    #[cfg(feature = "minijinja")]
+    #[test]
+    fn test_run_template_by_name_minijinja() {
+        let mut rgen = RRgen::default();
+        rgen.add_template("test_template", "Hello, {{ name }}!").unwrap();
+
+        let vars = json!({ "name": "World" });
+        let result = rgen.generate_by_template_with_name("test_template", &vars).unwrap();
+
+        if let GenResult::Generated { message } = result {
+            assert_eq!(message.unwrap(), "Hello, World!");
+        } else {
+            panic!("Template generation failed");
+        }
+    }
+
+    #[cfg(feature = "minijinja")]
+    #[test]
+    fn test_run_template_string_minijinja() {
+        let rgen = RRgen::default();
+        let template_str = "Hello, {{ name }}!";
+        let vars = json!({ "name": "World" });
+        let result = rgen.generate(template_str, &vars).unwrap();
+
+        if let GenResult::Generated { message } = result {
+            assert_eq!(message.unwrap(), "Hello, World!");
+        } else {
+            panic!("Template generation failed");
+        }
+    }
+
 
     #[test]
     fn test_parse_template() {

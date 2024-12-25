@@ -21,9 +21,9 @@ fn test_generate() {
         },
     )
     .unwrap();
-    let mut rrgen = RRgen::default();
+    let rgen = RRgen::default();
 
-    rrgen.generate(
+    rgen.generate(
         &fs::read_to_string("tests/fixtures/test1/template.t").unwrap(),
         &vars,
     )
@@ -50,9 +50,9 @@ fn test_generate_with_working_dir() {
         },
     )
     .unwrap();
-    let mut rrgen = RRgen::with_working_dir(&tree_fs.root);
+    let rgen = RRgen::with_working_dir(&tree_fs.root);
 
-    rrgen.generate(
+    rgen.generate(
         &fs::read_to_string("tests/fixtures/test1/template.t").unwrap(),
         &vars,
     )
@@ -80,14 +80,14 @@ fn test_realistic() {
         },
     )
     .unwrap();
-    let mut rrgen = RRgen::default();
+    let rgen = RRgen::default();
 
-    rrgen.generate(
+    rgen.generate(
         &fs::read_to_string("tests/fixtures/realistic/controller.t").unwrap(),
         &vars,
     )
     .unwrap();
-    rrgen.generate(
+    rgen.generate(
         &fs::read_to_string("tests/fixtures/realistic/task.t").unwrap(),
         &vars,
     )
