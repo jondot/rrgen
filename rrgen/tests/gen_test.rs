@@ -32,6 +32,39 @@ fn test_generate() {
 }
 
 #[test]
+fn test_generate_with_working_dir() {
+    let tree_fs = tree_fs::TreeBuilder::default()
+        .drop(true)
+        .create()
+        .expect("create temp file");
+    let FROM = "tests/fixtures/test1/app";
+    let GENERATED = "tests/fixtures/test1/generated";
+
+    let vars = json!({"name": "post"});
+    fs_extra::dir::copy(
+        FROM,
+        tree_fs.root.join(GENERATED),
+        &CopyOptions {
+            copy_inside: true,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let rgen = RRgen::with_working_dir(&tree_fs.root);
+
+    rgen.generate(
+        &fs::read_to_string("tests/fixtures/test1/template.t").unwrap(),
+        &vars,
+    )
+    .unwrap();
+    assert!(!dir_diff::is_different(
+        tree_fs.root.join(GENERATED),
+        "tests/fixtures/test1/expected"
+    )
+    .unwrap());
+}
+
+#[test]
 fn test_realistic() {
     let FROM = "tests/fixtures/realistic/app";
     let GENERATED = "tests/fixtures/realistic/generated";
