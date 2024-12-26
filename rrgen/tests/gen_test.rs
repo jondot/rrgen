@@ -94,3 +94,50 @@ fn test_realistic() {
     .unwrap();
     assert!(!dir_diff::is_different(GENERATED, "tests/fixtures/realistic/expected").unwrap());
 }
+
+#[cfg(test)]
+mod template_tests{
+    use serde_json::json;
+    use rrgen::{GenResult, RRgen};
+
+    #[test]
+    fn test_run_template_by_name_minijinja() {
+        let template_name = "test_template";
+        let template_str = r#"
+---
+to: ./file.txt
+message: "Hello"
+---
+Hello, {{ name }}!
+"#;
+        let rgen = RRgen::with_templates(vec![(template_name, template_str)]).unwrap();
+        let vars = json!({ "name": "World" });
+        let result = rgen.generate_by_template_with_name(template_name, &vars).unwrap();
+
+        if let GenResult::Generated { message } = result {
+            assert_eq!(message.unwrap(), "Hello");
+        } else {
+            panic!("Template generation failed");
+        }
+    }
+
+    #[test]
+    fn test_run_template_string_minijinja() {
+        let rgen = RRgen::default();
+        let vars = json!({ "name": "World" });
+        let template_str = r#"
+---
+to: ./file.txt
+message: "Hello"
+---
+Hello, {{ name }}!
+"#;
+        let result = rgen.generate(template_str, &vars).unwrap();
+
+        if let GenResult::Generated { message } = result {
+            assert_eq!(message.unwrap(), "Hello");
+        } else {
+            panic!("Template generation failed");
+        }
+    }
+}

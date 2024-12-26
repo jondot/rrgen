@@ -361,8 +361,6 @@ impl RRgen {
     ///
     /// This function will return an error if operation fails
     fn handle_frontmatter_and_body(&self, frontmatter: FrontMatter, body: String) -> Result<GenResult> {
-        let path_to = Path::new(&frontmatter.to);
-
         let path_to = if let Some(working_dir) = &self.working_dir {
             working_dir.join(frontmatter.to)
         } else {
@@ -479,85 +477,8 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    #[cfg(feature = "tera")]
     #[test]
-    fn test_instantiate_tera() {
-        let tera = Tera::default();
-        assert_eq!(tera.get_template_names().count(), 0);
-    }
-
-    #[cfg(feature = "tera")]
-    #[test]
-    fn test_run_template_by_name() {
-        let mut rgen = RRgen::default();
-        rgen.add_template("test_template", "Hello, {{ name }}!").unwrap();
-
-        let vars = json!({ "name": "World" });
-        let result = rgen.generate_by_template_with_name("test_template", &vars).unwrap();
-
-        if let GenResult::Generated { message } = result {
-            assert_eq!(message.unwrap(), "Hello, World!");
-        } else {
-            panic!("Template generation failed");
-        }
-    }
-
-    #[cfg(feature = "tera")]
-    #[test]
-    fn test_run_template_string() {
-        let rgen = RRgen::default();
-        let template_str = "Hello, {{ name }}!";
-        let vars = json!({ "name": "World" });
-        let result = rgen.generate(template_str, &vars).unwrap();
-
-        if let GenResult::Generated { message } = result {
-            assert_eq!(message.unwrap(), "Hello, World!");
-        } else {
-            panic!("Template generation failed");
-        }
-    }
-
-    #[cfg(feature = "minijinja")]
-    #[test]
-    fn test_instantiate_minijinja() {
-        let minijinja = Environment::new();
-        assert_eq!(minijinja.templates().count(), 0);
-    }
-
-    #[cfg(feature = "minijinja")]
-    #[test]
-    fn test_run_template_by_name_minijinja() {
-        let mut rgen = RRgen::default();
-        rgen.add_template("test_template", "Hello, {{ name }}!").unwrap();
-
-        let vars = json!({ "name": "World" });
-        let result = rgen.generate_by_template_with_name("test_template", &vars).unwrap();
-
-        if let GenResult::Generated { message } = result {
-            assert_eq!(message.unwrap(), "Hello, World!");
-        } else {
-            panic!("Template generation failed");
-        }
-    }
-
-    #[cfg(feature = "minijinja")]
-    #[test]
-    fn test_run_template_string_minijinja() {
-        let rgen = RRgen::default();
-        let template_str = "Hello, {{ name }}!";
-        let vars = json!({ "name": "World" });
-        let result = rgen.generate(template_str, &vars).unwrap();
-
-        if let GenResult::Generated { message } = result {
-            assert_eq!(message.unwrap(), "Hello, World!");
-        } else {
-            panic!("Template generation failed");
-        }
-    }
-
-
-    #[test]
-    fn test_parse_template() {
+    fn multiple_headers() {
         let input = r#"
 ---
 to: file1.txt
@@ -580,43 +501,43 @@ print some content #2
     }
 
     #[test]
-    fn test_single_header_template_with_split() {
+    fn single_header_template_with_split() {
         let input = r#"
 ---
-to: file1.txt
-message: "File file1.txt was created successfully."
+to: file3.txt
+message: "File file3.txt was created successfully."
 ---
-print some content #1
+print some content #3
 "#;
 
         let result = parse_template(input).unwrap();
         assert_eq!(result.len(), 1);
-        assert_eq!(result[0].0.to, "file1.txt");
-        assert_eq!(result[0].1, "print some content #1");
+        assert_eq!(result[0].0.to, "file3.txt");
+        assert_eq!(result[0].1, "print some content #3");
     }
 
     #[test]
-    fn test_single_header_template_without_split() {
+    fn single_header_template_without_split() {
         let input = r#"
-to: file1.txt
-message: "File file1.txt was created successfully."
+to: file4.txt
+message: "File file4.txt was created successfully."
 ---
-print some content #1
+print some content #4
 "#;
 
         let result = parse_template(input).unwrap();
         assert_eq!(result.len(), 1);
-        assert_eq!(result[0].0.to, "file1.txt");
-        assert_eq!(result[0].1, "print some content #1");
+        assert_eq!(result[0].0.to, "file4.txt");
+        assert_eq!(result[0].1, "print some content #4");
     }
 
 
     #[test]
-    fn test_parse_template_with_error() {
+    fn parse_template_with_error() {
         let input = r#"
 ---
-to: ./file1.txt
-message: "File file1.txt was created successfully."
+to: ./file5.txt
+message: "File file5.txt was created successfully."
 ---
 print some content
 --- incomplete header
