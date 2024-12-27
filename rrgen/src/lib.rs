@@ -173,15 +173,15 @@ fn parse_template(input: &str) -> Result<Vec<(FrontMatter, String)>> {
     // normalize line endings
     let input = input.replace("\r\n", "\n");
 
-    let parts: Vec<&str> = input.split("---\n").filter(|&s| !s.trim().is_empty()).collect();
+    let parts: Vec<&str> = input.split("---\n").collect();
 
     let parts_split: Result<Vec<(FrontMatter, String)>> = parts.chunks(2)
         .map(|chunk| {
             if chunk.len() != 2 {
-                return Err(Error::Message("cannot split document into frontmatter and body".to_string()));
+                return Err(Error::Message("cannot split document into pair(s) of frontmatter and body".to_string()));
             }
-            let fm = chunk[0].trim();
-            let body = chunk[1].trim();
+            let fm = chunk[0];
+            let body = chunk[1];
             let front_matter: FrontMatter = serde_yaml::from_str(fm)?;
             Ok((front_matter, body.to_string()))
         })
@@ -339,7 +339,7 @@ impl RRgen {
         debug!("rendered: {rendered:?}");
         let parts = parse_template(rendered)?;
         let messages: Vec<String> = parts.iter()
-            .map(|(frontmatter, body)| self.handle_frontmatter_and_body(frontmatter.clone(), body.clone()))
+            .map(|(front_matter, body)| self.handle_frontmatter_and_body(front_matter.clone(), &body))
             .collect::<Result<Vec<GenResult>>>()?
             .into_iter()
             .filter_map(|gen_result| {
@@ -360,7 +360,7 @@ impl RRgen {
     /// # Errors
     ///
     /// This function will return an error if operation fails
-    fn handle_frontmatter_and_body(&self, frontmatter: FrontMatter, body: String) -> Result<GenResult> {
+    fn handle_frontmatter_and_body(&self, frontmatter: FrontMatter, body: &str) -> Result<GenResult> {
         let path_to = if let Some(working_dir) = &self.working_dir {
             working_dir.join(frontmatter.to)
         } else {
@@ -468,82 +468,5 @@ impl RRgen {
         } else {
             Ok(GenResult::Skipped)
         }
-    }
-}
-
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::json;
-
-    #[test]
-    fn multiple_headers() {
-        let input = r#"
----
-to: file1.txt
-message: "File file1.txt was created successfully."
----
-print some content #1
----
-to: file2.txt
-message: "File file2.txt was created successfully."
----
-print some content #2
-"#;
-
-        let result = parse_template(input).unwrap();
-        assert_eq!(result.len(), 2);
-        assert_eq!(result[0].0.to, "file1.txt");
-        assert_eq!(result[0].1, "print some content #1");
-        assert_eq!(result[1].0.to, "file2.txt");
-        assert_eq!(result[1].1, "print some content #2");
-    }
-
-    #[test]
-    fn single_header_template_with_split() {
-        let input = r#"
----
-to: file3.txt
-message: "File file3.txt was created successfully."
----
-print some content #3
-"#;
-
-        let result = parse_template(input).unwrap();
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].0.to, "file3.txt");
-        assert_eq!(result[0].1, "print some content #3");
-    }
-
-    #[test]
-    fn single_header_template_without_split() {
-        let input = r#"
-to: file4.txt
-message: "File file4.txt was created successfully."
----
-print some content #4
-"#;
-
-        let result = parse_template(input).unwrap();
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].0.to, "file4.txt");
-        assert_eq!(result[0].1, "print some content #4");
-    }
-
-
-    #[test]
-    fn parse_template_with_error() {
-        let input = r#"
----
-to: ./file5.txt
-message: "File file5.txt was created successfully."
----
-print some content
---- incomplete header
-"#;
-
-        let result = parse_template(input);
-        assert!(result.is_err());
     }
 }

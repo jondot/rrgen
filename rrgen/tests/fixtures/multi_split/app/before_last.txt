@@ -1,0 +1,13 @@
+this is a mod file
+and this is another line
+
+vec![
+// should not be modified  
+]
+pub class Foobar {
+  blah
+  vec![
+    1,
+    2,
+  ]
+}

@@ -32,6 +32,32 @@ fn test_generate() {
 }
 
 #[test]
+fn test_generate_multiple_headers() {
+    let FROM = "tests/fixtures/multi_split/app";
+    let GENERATED = "tests/fixtures/multi_split/generated";
+
+    let vars = json!({"name": "post"});
+    fs_extra::dir::remove(GENERATED).unwrap();
+    fs_extra::dir::copy(
+        FROM,
+        GENERATED,
+        &CopyOptions {
+            copy_inside: true,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let rgen = RRgen::default();
+
+    rgen.generate(
+        &fs::read_to_string("tests/fixtures/multi_split/template.t").unwrap(),
+        &vars,
+    )
+    .unwrap();
+    assert!(!dir_diff::is_different(GENERATED, "tests/fixtures/multi_split/expected").unwrap());
+}
+
+#[test]
 fn test_generate_with_working_dir() {
     let tree_fs = tree_fs::TreeBuilder::default()
         .drop(true)
