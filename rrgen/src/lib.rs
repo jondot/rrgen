@@ -174,6 +174,7 @@ fn parse_template(input: &str) -> Result<Vec<(FrontMatter, String)>> {
     let input = input.replace("\r\n", "\n");
 
     let parts: Vec<&str> = input.split("---\n").collect();
+    let parts = &parts[1..];
 
     let parts_split: Result<Vec<(FrontMatter, String)>> = parts.chunks(2)
         .map(|chunk| {

@@ -1,0 +1,10 @@
+this is a mod file
+and this is another line
+Hello {
+// should not be modified  
+}
+
+pub class Foobar {
+field: integer2
+  blah
+}

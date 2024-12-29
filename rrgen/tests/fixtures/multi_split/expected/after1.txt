@@ -2,6 +2,6 @@ this is a mod file
 and this is another line
 
 pub class Foobar {
-field: integer
+field: integer1
   blah
 }

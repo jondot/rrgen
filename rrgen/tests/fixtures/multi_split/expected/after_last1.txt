@@ -5,6 +5,6 @@ Hello {
 }
 
 pub class Foobar {
-field: integer
+field: integer1
   blah
 }

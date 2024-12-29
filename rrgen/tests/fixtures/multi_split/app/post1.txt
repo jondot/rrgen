@@ -1,4 +1,3 @@
-
 hello, this is the file body.
 
-variable: Post
+variable: 1
