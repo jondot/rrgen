@@ -172,9 +172,14 @@ pub enum GenResult {
 fn parse_template(input: &str) -> Result<Vec<(FrontMatter, String)>> {
     // normalize line endings
     let input = input.replace("\r\n", "\n");
+    debug!("input: {input:?}");
+    let mut parts: Vec<&str> = input.split("---\n").collect();
+    debug!("parts: {parts:?}");
 
-    let parts: Vec<&str> = input.split("---\n").collect();
-    let parts = &parts[1..];
+    if parts.len()!=2 {
+        parts = parts.into_iter().filter(|part| !part.replace("\n","").replace("\t","").eq("")).collect();
+        debug!("new parts: {parts:?}");
+    }
 
     let parts_split: Result<Vec<(FrontMatter, String)>> = parts.chunks(2)
         .map(|chunk| {
@@ -183,6 +188,8 @@ fn parse_template(input: &str) -> Result<Vec<(FrontMatter, String)>> {
             }
             let fm = chunk[0];
             let body = chunk[1];
+            debug!("frontmatter: {fm:?}");
+            debug!("body: {body:?}");
             let front_matter: FrontMatter = serde_yaml::from_str(fm)?;
             Ok((front_matter, body.to_string()))
         })
@@ -264,9 +271,9 @@ impl RRgen {
     /// # Errors
     ///
     /// This function will return an error if operation fails
-    pub fn with_templates<I>(templates: I) -> std::result::Result<Self, Error>
+    pub fn with_templates<'a, I>(templates: I) -> std::result::Result<Self, Error>
     where
-        I: IntoIterator<Item = (&'static str, &'static str)>,
+        I: IntoIterator<Item = (&'a str, &'a str)>,
     {
         let mut rgen = RRgen::default();
         for (name, content) in templates {
