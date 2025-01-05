@@ -84,7 +84,8 @@ impl Printer for ConsolePrinter {
 
 #[derive(Deserialize, Debug, Default, Clone)]
 struct FrontMatter {
-    to: String,
+    #[serde(default)]
+    to: Option<String>,
 
     #[serde(default)]
     skip_exists: bool,
@@ -369,30 +370,32 @@ impl RRgen {
     ///
     /// This function will return an error if operation fails
     fn handle_frontmatter_and_body(&self, frontmatter: FrontMatter, body: &str) -> Result<GenResult> {
-        let path_to = if let Some(working_dir) = &self.working_dir {
-            working_dir.join(frontmatter.to)
-        } else {
-            PathBuf::from(&frontmatter.to)
-        };
+        if frontmatter.to.is_some() {
+            let path_to = if let Some(working_dir) = &self.working_dir {
+                working_dir.join(frontmatter.to.unwrap())
+            } else {
+                PathBuf::from(&frontmatter.to.unwrap())
+            };
 
-        if frontmatter.skip_exists && self.fs.exists(&path_to) {
-            self.printer.skip_exists(&path_to);
-            return Ok(GenResult::Skipped);
-        }
-        if let Some(skip_glob) = frontmatter.skip_glob {
-            if glob::glob(&skip_glob)?.count() > 0 {
+            if frontmatter.skip_exists && self.fs.exists(&path_to) {
                 self.printer.skip_exists(&path_to);
                 return Ok(GenResult::Skipped);
             }
-        }
+            if let Some(skip_glob) = frontmatter.skip_glob {
+                if glob::glob(&skip_glob)?.count() > 0 {
+                    self.printer.skip_exists(&path_to);
+                    return Ok(GenResult::Skipped);
+                }
+            }
 
-        if self.fs.exists(&path_to) {
-            self.printer.overwrite_file(&path_to);
-        } else {
-            self.printer.add_file(&path_to);
+            if self.fs.exists(&path_to) {
+                self.printer.overwrite_file(&path_to);
+            } else {
+                self.printer.add_file(&path_to);
+            }
+            // write main file
+            self.fs.write_file(&path_to, &body)?;
         }
-        // write main file
-        self.fs.write_file(&path_to, &body)?;
 
         // handle injects
         self.handle_injects(frontmatter.injections, frontmatter.message.clone())?;
