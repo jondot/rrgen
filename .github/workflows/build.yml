@@ -63,7 +63,6 @@ jobs:
           command: test
           args: --features minijinja --no-default-features
 
-
   coverage:
     name: Coverage
     strategy:

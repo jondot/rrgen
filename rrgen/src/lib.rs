@@ -370,10 +370,7 @@ impl RRgen {
         self.fs.write_file(&path_to, body)?;
 
         // handle injects
-        self.handle_injects(frontmatter.injections, frontmatter.message.clone())?;
-        Ok(GenResult::Generated {
-            message: frontmatter.message.clone(),
-        })
+        self.handle_injects(frontmatter.injections, frontmatter.message.clone())
     }
 
     fn handle_injects(
@@ -449,11 +446,7 @@ impl RRgen {
                 self.fs.write_file(&injection_to, &new_content)?;
                 self.printer.injected(&injection_to);
             }
-            Ok(GenResult::Generated {
-                message: message.clone(),
-            })
-        } else {
-            Ok(GenResult::Skipped)
         }
+        Ok(GenResult::Generated { message })
     }
 }
