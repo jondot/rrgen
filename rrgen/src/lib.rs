@@ -12,7 +12,6 @@ use serde::Deserialize;
 use tera::{Context, Tera};
 #[cfg(feature = "minijinja")]
 use minijinja::{Environment};
-use log::debug;
 
 #[cfg(feature = "tera")]
 mod tera_filters;
@@ -82,10 +81,9 @@ impl Printer for ConsolePrinter {
     }
 }
 
-#[derive(Deserialize, Debug, Default, Clone)]
+#[derive(Deserialize, Debug, Default)]
 struct FrontMatter {
-    #[serde(default)]
-    to: Option<String>,
+    to: String,
 
     #[serde(default)]
     skip_exists: bool,
@@ -165,40 +163,16 @@ pub enum GenResult {
     Generated { message: Option<String> },
 }
 
-/// Split `input` into chunks according to `---` separator and return a vec of pairs of frontmatter and body.
-///
-/// # Errors
-///
-/// This function will return an error if operation fails
-fn parse_template(input: &str) -> Result<Vec<(FrontMatter, String)>> {
+fn parse_template(input: &str) -> Result<(FrontMatter, String)> {
     // normalize line endings
     let input = input.replace("\r\n", "\n");
-    debug!("input: {input:?}");
-    let mut parts: Vec<&str> = input.split("---\n").collect();
-    debug!("parts: {parts:?}");
 
-    if parts.len()!=2 {
-        parts = parts.into_iter().filter(|part| !part.replace("\n","").replace("\t","").eq("")).collect();
-        debug!("new parts: {parts:?}");
-    }
-
-    let parts_split: Result<Vec<(FrontMatter, String)>> = parts.chunks(2)
-        .map(|chunk| {
-            if chunk.len() != 2 {
-                return Err(Error::Message("cannot split document into pair(s) of frontmatter and body".to_string()));
-            }
-            let fm = chunk[0];
-            let body = chunk[1];
-            debug!("frontmatter: {fm:?}");
-            debug!("body: {body:?}");
-            let front_matter: FrontMatter = serde_yaml::from_str(fm)?;
-            Ok((front_matter, body.to_string()))
-        })
-        .collect();
-
-    parts_split
+    let (fm, body) = input.split_once("---\n").ok_or_else(|| {
+        Error::Message("cannot split document to frontmatter and body".to_string())
+    })?;
+    let frontmatter: FrontMatter = serde_yaml::from_str(fm)?;
+    Ok((frontmatter, body.to_string()))
 }
-
 pub struct RRgen {
     working_dir: Option<PathBuf>,
     fs: Box<dyn FsDriver>,
@@ -283,37 +257,14 @@ impl RRgen {
         Ok(rgen)
     }
 
-    /// Generate from a template contained in `input`
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if operation fails
-    pub fn generate(&self, input: &str, vars: &serde_json::Value) -> Result<GenResult> {
-        debug!("generating from template: {input:?}");
-        debug!("template vars: {:?}", serde_json::to_string(&vars)?);
-        #[cfg(feature = "tera")]{
-            let mut tera = self.tera.clone();
-            let rendered = tera.render_str(input, &Context::from_serialize(vars.clone())?)?;
-            debug!("rendered: {rendered:?}");
-            self.handle_rendered(rendered.as_str())
-        }
-        #[cfg(feature = "minijinja")]{
-            let rendered = self.minijinja.render_str(input, vars.clone())?;
-            self.handle_rendered(rendered.as_str())
-        }
-    }
-
     /// Generate from a template added in the template engine given by `name`
     ///
     /// # Errors
     ///
     /// This function will return an error if operation fails
     pub fn generate_by_template_with_name(&self, name: &str, vars: &serde_json::Value) -> Result<GenResult> {
-        debug!("generating from template with name: {name:?}, vars: {:?}",serde_json::to_string(&vars)?);
-
         #[cfg(feature = "tera")]{
             let rendered = self.tera.render(name, &Context::from_serialize(vars.clone())?)?;
-            debug!("rendered: {rendered:?}");
             self.handle_rendered(&rendered)
         }
 
@@ -339,29 +290,23 @@ impl RRgen {
         Ok(())
     }
 
-    /// Handle rendered string by splitting to pairs of frontmatter and body and then handle frontmatter
+    /// Generate from a template contained in `input`
     ///
     /// # Errors
     ///
     /// This function will return an error if operation fails
-    fn handle_rendered(&self, rendered: &str) -> Result<GenResult> {
-        debug!("rendered: {rendered:?}");
-        let parts = parse_template(rendered)?;
-        let messages: Vec<String> = parts.iter()
-            .map(|(front_matter, body)| self.handle_frontmatter_and_body(front_matter.clone(), &body))
-            .collect::<Result<Vec<GenResult>>>()?
-            .into_iter()
-            .filter_map(|gen_result| {
-                if let GenResult::Generated { message: Some(msg) } = gen_result {
-                    Some(msg)
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        let merged_message = messages.join("\n");
-        Ok(GenResult::Generated { message: Some(merged_message) })
+    pub fn generate(&self, input: &str, vars: &serde_json::Value) -> Result<GenResult> {
+        #[cfg(feature = "tera")]{
+            let mut tera = self.tera.clone();
+            let rendered = tera.render_str(input, &Context::from_serialize(vars.clone())?)?;
+            let (frontmatter, body) = parse_template(&rendered)?;
+            self.handle_frontmatter_and_body(frontmatter,&body)
+        }
+        #[cfg(feature = "minijinja")]{
+            let rendered = self.minijinja.render_str(input, vars.clone())?;
+            let (frontmatter, body) = parse_template(&rendered)?;
+            self.handle_frontmatter_and_body(frontmatter,&body)
+        }
     }
 
     /// Handle frontmatter and body
@@ -370,32 +315,30 @@ impl RRgen {
     ///
     /// This function will return an error if operation fails
     fn handle_frontmatter_and_body(&self, frontmatter: FrontMatter, body: &str) -> Result<GenResult> {
-        if frontmatter.to.is_some() {
-            let path_to = if let Some(working_dir) = &self.working_dir {
-                working_dir.join(frontmatter.to.unwrap())
-            } else {
-                PathBuf::from(&frontmatter.to.unwrap())
-            };
+        let path_to = if let Some(working_dir) = &self.working_dir {
+            working_dir.join(frontmatter.to)
+        } else {
+            PathBuf::from(&frontmatter.to)
+        };
 
-            if frontmatter.skip_exists && self.fs.exists(&path_to) {
+        if frontmatter.skip_exists && self.fs.exists(&path_to) {
+            self.printer.skip_exists(&path_to);
+            return Ok(GenResult::Skipped);
+        }
+        if let Some(skip_glob) = frontmatter.skip_glob {
+            if glob::glob(&skip_glob)?.count() > 0 {
                 self.printer.skip_exists(&path_to);
                 return Ok(GenResult::Skipped);
             }
-            if let Some(skip_glob) = frontmatter.skip_glob {
-                if glob::glob(&skip_glob)?.count() > 0 {
-                    self.printer.skip_exists(&path_to);
-                    return Ok(GenResult::Skipped);
-                }
-            }
-
-            if self.fs.exists(&path_to) {
-                self.printer.overwrite_file(&path_to);
-            } else {
-                self.printer.add_file(&path_to);
-            }
-            // write main file
-            self.fs.write_file(&path_to, &body)?;
         }
+
+        if self.fs.exists(&path_to) {
+            self.printer.overwrite_file(&path_to);
+        } else {
+            self.printer.add_file(&path_to);
+        }
+        // write main file
+        self.fs.write_file(&path_to, &body)?;
 
         // handle injects
         self.handle_injects(frontmatter.injections, frontmatter.message.clone())?;
