@@ -191,6 +191,7 @@ impl Default for RRgen {
 
         #[cfg(feature = "minijinja")]
         let mut minijinja = Environment::new();
+        minijinja.set_keep_trailing_newline(true);
         #[cfg(feature = "minijinja")]
         minijinja_filters::register_all(&mut minijinja);
 
