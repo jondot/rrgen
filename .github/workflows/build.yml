@@ -2,11 +2,6 @@ name: Build
 on:
   pull_request:
   push:
-    branches:
-      - master
-  # you can enable a schedule to build
-  # schedule:
-  # - cron: '00 01 * * *'
 
 jobs:
   check:
