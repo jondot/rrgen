@@ -6,18 +6,17 @@ compile_error!("You must enable exactly one feature: 'tera' or 'minijinja'.");
 
 use std::path::{Path, PathBuf};
 
+#[cfg(feature = "minijinja")]
+use minijinja::Environment;
 use regex::Regex;
 use serde::Deserialize;
 #[cfg(feature = "tera")]
 use tera::{Context, Tera};
-#[cfg(feature = "minijinja")]
-use minijinja::{Environment};
 
-#[cfg(feature = "tera")]
-mod tera_filters;
 #[cfg(feature = "minijinja")]
 mod minijinja_filters;
-
+#[cfg(feature = "tera")]
+mod tera_filters;
 
 pub trait FsDriver {
     /// Write a file
@@ -263,11 +262,14 @@ impl RRgen {
     ///
     /// This function will return an error if operation fails
     fn add_template(&mut self, name: &str, template: &str) -> Result<()> {
-        #[cfg(feature = "tera")]{
+        #[cfg(feature = "tera")]
+        {
             self.tera.add_raw_template(name, template)?
         }
-        #[cfg(feature = "minijinja")]{
-            self.minijinja.add_template_owned(name.to_string(), template.to_string())?
+        #[cfg(feature = "minijinja")]
+        {
+            self.minijinja
+                .add_template_owned(name.to_string(), template.to_string())?
         }
         Ok(())
     }
@@ -278,12 +280,14 @@ impl RRgen {
     ///
     /// This function will return an error if operation fails
     pub fn generate(&self, input: &str, vars: &serde_json::Value) -> Result<GenResult> {
-        #[cfg(feature = "tera")]{
+        #[cfg(feature = "tera")]
+        {
             let mut tera = self.tera.clone();
             let rendered = tera.render_str(input, &Context::from_serialize(vars.clone())?)?;
             self.handle_rendered(&rendered)
         }
-        #[cfg(feature = "minijinja")]{
+        #[cfg(feature = "minijinja")]
+        {
             let rendered = self.minijinja.render_str(input, vars.clone())?;
             self.handle_rendered(&rendered)
         }
@@ -294,13 +298,21 @@ impl RRgen {
     /// # Errors
     ///
     /// This function will return an error if operation fails
-    pub fn generate_by_template_with_name(&self, name: &str, vars: &serde_json::Value) -> Result<GenResult> {
-        #[cfg(feature = "tera")]{
-            let rendered = self.tera.render(name, &Context::from_serialize(vars.clone())?)?;
+    pub fn generate_by_template_with_name(
+        &self,
+        name: &str,
+        vars: &serde_json::Value,
+    ) -> Result<GenResult> {
+        #[cfg(feature = "tera")]
+        {
+            let rendered = self
+                .tera
+                .render(name, &Context::from_serialize(vars.clone())?)?;
             self.handle_rendered(&rendered)
         }
 
-        #[cfg(feature = "minijinja")]{
+        #[cfg(feature = "minijinja")]
+        {
             let template = self.minijinja.get_template(name);
             let rendered = template?.render(vars)?;
             self.handle_rendered(rendered.as_str())
@@ -313,8 +325,8 @@ impl RRgen {
     ///
     /// This function will return an error if operation fails
     fn handle_rendered(&self, rendered: &str) -> Result<GenResult> {
-        let (frontmatter, body) = parse_template(&rendered)?;
-        self.handle_frontmatter_and_body(frontmatter,&body)
+        let (frontmatter, body) = parse_template(rendered)?;
+        self.handle_frontmatter_and_body(frontmatter, &body)
     }
 
     /// Handle frontmatter and body
@@ -322,7 +334,11 @@ impl RRgen {
     /// # Errors
     ///
     /// This function will return an error if operation fails
-    fn handle_frontmatter_and_body(&self, frontmatter: FrontMatter, body: &str) -> Result<GenResult> {
+    fn handle_frontmatter_and_body(
+        &self,
+        frontmatter: FrontMatter,
+        body: &str,
+    ) -> Result<GenResult> {
         let path_to = if let Some(working_dir) = &self.working_dir {
             working_dir.join(frontmatter.to)
         } else {
@@ -346,7 +362,7 @@ impl RRgen {
             self.printer.add_file(&path_to);
         }
         // write main file
-        self.fs.write_file(&path_to, &body)?;
+        self.fs.write_file(&path_to, body)?;
 
         // handle injects
         self.handle_injects(frontmatter.injections, frontmatter.message.clone())?;
@@ -355,7 +371,11 @@ impl RRgen {
         })
     }
 
-    fn handle_injects(&self, injections: Option<Vec<Injection>>, message: Option<String>) -> Result<GenResult> {
+    fn handle_injects(
+        &self,
+        injections: Option<Vec<Injection>>,
+        message: Option<String>,
+    ) -> Result<GenResult> {
         if let Some(injections) = injections {
             for injection in &injections {
                 let injection_to = self.working_dir.as_ref().map_or_else(

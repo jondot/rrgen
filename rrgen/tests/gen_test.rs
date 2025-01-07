@@ -22,14 +22,14 @@ mod tera_tests {
                 ..Default::default()
             },
         )
-            .unwrap();
+        .unwrap();
         let rgen = RRgen::default();
 
         rgen.generate(
             &fs::read_to_string("tests/fixtures/test1/template.t").unwrap(),
             &vars,
         )
-            .unwrap();
+        .unwrap();
         assert!(!dir_diff::is_different(GENERATED, "tests/fixtures/test1/expected").unwrap());
     }
 
@@ -48,14 +48,14 @@ mod tera_tests {
                 ..Default::default()
             },
         )
-            .unwrap();
+        .unwrap();
         let rgen = RRgen::default();
 
         rgen.generate(
             &fs::read_to_string("tests/fixtures/multi_split/template.t").unwrap(),
             &vars,
         )
-            .unwrap();
+        .unwrap();
         assert!(!dir_diff::is_different(GENERATED, "tests/fixtures/multi_split/expected").unwrap());
     }
 
@@ -77,19 +77,19 @@ mod tera_tests {
                 ..Default::default()
             },
         )
-            .unwrap();
+        .unwrap();
         let rgen = RRgen::with_working_dir(&tree_fs.root);
 
         rgen.generate(
             &fs::read_to_string("tests/fixtures/test1/template.t").unwrap(),
             &vars,
         )
-            .unwrap();
+        .unwrap();
         assert!(!dir_diff::is_different(
             tree_fs.root.join(GENERATED),
             "tests/fixtures/test1/expected"
         )
-            .unwrap());
+        .unwrap());
     }
 
     #[test]
@@ -107,26 +107,26 @@ mod tera_tests {
                 ..Default::default()
             },
         )
-            .unwrap();
+        .unwrap();
         let rgen = RRgen::default();
 
         rgen.generate(
             &fs::read_to_string("tests/fixtures/realistic/controller.t").unwrap(),
             &vars,
         )
-            .unwrap();
+        .unwrap();
         rgen.generate(
             &fs::read_to_string("tests/fixtures/realistic/task.t").unwrap(),
             &vars,
         )
-            .unwrap();
+        .unwrap();
         assert!(!dir_diff::is_different(GENERATED, "tests/fixtures/realistic/expected").unwrap());
     }
 
     #[cfg(test)]
     mod template_tests {
-        use serde_json::json;
         use rrgen::{GenResult, RRgen};
+        use serde_json::json;
 
         #[test]
         fn test_run_template_by_name_minijinja() {
@@ -140,7 +140,9 @@ Hello, {{ name }}!
 "#;
             let rgen = RRgen::with_templates(vec![(template_name, template_str)]).unwrap();
             let vars = json!({ "name": "World" });
-            let result = rgen.generate_by_template_with_name(template_name, &vars).unwrap();
+            let result = rgen
+                .generate_by_template_with_name(template_name, &vars)
+                .unwrap();
 
             if let GenResult::Generated { message } = result {
                 assert_eq!(message.unwrap(), "Hello");
@@ -195,14 +197,14 @@ mod minijinja_tests {
                 ..Default::default()
             },
         )
-            .unwrap();
+        .unwrap();
         let rgen = RRgen::default();
 
         rgen.generate(
             &fs::read_to_string("tests/fixtures/test1/template.t").unwrap(),
             &vars,
         )
-            .unwrap();
+        .unwrap();
         assert!(!dir_diff::is_different(GENERATED, "tests/fixtures/test1/expected").unwrap());
     }
 
@@ -221,14 +223,14 @@ mod minijinja_tests {
                 ..Default::default()
             },
         )
-            .unwrap();
+        .unwrap();
         let rgen = RRgen::default();
 
         rgen.generate(
             &fs::read_to_string("tests/fixtures/multi_split/template.t").unwrap(),
             &vars,
         )
-            .unwrap();
+        .unwrap();
         assert!(!dir_diff::is_different(GENERATED, "tests/fixtures/multi_split/expected").unwrap());
     }
 
@@ -250,19 +252,19 @@ mod minijinja_tests {
                 ..Default::default()
             },
         )
-            .unwrap();
+        .unwrap();
         let rgen = RRgen::with_working_dir(&tree_fs.root);
 
         rgen.generate(
             &fs::read_to_string("tests/fixtures/test1/template.t").unwrap(),
             &vars,
         )
-            .unwrap();
+        .unwrap();
         assert!(!dir_diff::is_different(
             tree_fs.root.join(GENERATED),
             "tests/fixtures/test1/expected"
         )
-            .unwrap());
+        .unwrap());
     }
 
     #[test]
@@ -280,26 +282,26 @@ mod minijinja_tests {
                 ..Default::default()
             },
         )
-            .unwrap();
+        .unwrap();
         let rgen = RRgen::default();
 
         rgen.generate(
             &fs::read_to_string("tests/fixtures/realistic/controller.t").unwrap(),
             &vars,
         )
-            .unwrap();
+        .unwrap();
         rgen.generate(
             &fs::read_to_string("tests/fixtures/realistic/task.t").unwrap(),
             &vars,
         )
-            .unwrap();
+        .unwrap();
         assert!(!dir_diff::is_different(GENERATED, "tests/fixtures/realistic/expected").unwrap());
     }
 
     #[cfg(test)]
     mod template_tests {
-        use serde_json::json;
         use rrgen::{GenResult, RRgen};
+        use serde_json::json;
 
         #[test]
         fn test_run_template_by_name_minijinja() {
@@ -313,7 +315,9 @@ Hello, {{ name }}!
 "#;
             let rgen = RRgen::with_templates(vec![(template_name, template_str)]).unwrap();
             let vars = json!({ "name": "World" });
-            let result = rgen.generate_by_template_with_name(template_name, &vars).unwrap();
+            let result = rgen
+                .generate_by_template_with_name(template_name, &vars)
+                .unwrap();
 
             if let GenResult::Generated { message } = result {
                 assert_eq!(message.unwrap(), "Hello");
