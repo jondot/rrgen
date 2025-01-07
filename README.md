@@ -70,7 +70,9 @@ rrgen.generate(
 
 `vars` will be variables that are exposed both for the _frontmatter_ part and the _body_ part.
 
-### Switch template engine
-To use `minijinja` instead of `Tera` as the template engine, you must set the following in Cargo.toml
+### Minijinja as alternative template engine
+To use `minijinja` instead of `Tera` as the template engine, you must set dependency of rrgen in Cargo.toml as following:
 
-`rrgen = { version="X.X.X", default-features = false, features = ["minijinja"] }`
+```rust
+rrgen = { version="X.X.X", default-features = false, features = ["minijinja"] }
+```
