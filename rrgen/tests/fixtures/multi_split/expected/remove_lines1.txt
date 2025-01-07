@@ -1,3 +1,0 @@
-this is a mod file
-foo
-bar
