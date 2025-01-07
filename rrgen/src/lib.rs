@@ -257,24 +257,6 @@ impl RRgen {
         Ok(rgen)
     }
 
-    /// Generate from a template added in the template engine given by `name`
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if operation fails
-    pub fn generate_by_template_with_name(&self, name: &str, vars: &serde_json::Value) -> Result<GenResult> {
-        #[cfg(feature = "tera")]{
-            let rendered = self.tera.render(name, &Context::from_serialize(vars.clone())?)?;
-            self.handle_rendered(&rendered)
-        }
-
-        #[cfg(feature = "minijinja")]{
-            let template = self.minijinja.get_template(name);
-            let rendered = template?.render(vars)?;
-            self.handle_rendered(rendered.as_str())
-        }
-    }
-
     /// Add template with the given name in template engine
     ///
     /// # Errors
@@ -299,14 +281,40 @@ impl RRgen {
         #[cfg(feature = "tera")]{
             let mut tera = self.tera.clone();
             let rendered = tera.render_str(input, &Context::from_serialize(vars.clone())?)?;
-            let (frontmatter, body) = parse_template(&rendered)?;
-            self.handle_frontmatter_and_body(frontmatter,&body)
+            self.handle_rendered(&rendered)
         }
         #[cfg(feature = "minijinja")]{
             let rendered = self.minijinja.render_str(input, vars.clone())?;
-            let (frontmatter, body) = parse_template(&rendered)?;
-            self.handle_frontmatter_and_body(frontmatter,&body)
+            self.handle_rendered(&rendered)
         }
+    }
+
+    /// Generate from a template added in the template engine given by `name`
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if operation fails
+    pub fn generate_by_template_with_name(&self, name: &str, vars: &serde_json::Value) -> Result<GenResult> {
+        #[cfg(feature = "tera")]{
+            let rendered = self.tera.render(name, &Context::from_serialize(vars.clone())?)?;
+            self.handle_rendered(&rendered)
+        }
+
+        #[cfg(feature = "minijinja")]{
+            let template = self.minijinja.get_template(name);
+            let rendered = template?.render(vars)?;
+            self.handle_rendered(rendered.as_str())
+        }
+    }
+
+    /// Handle rendered string by splitting to frontmatter and body and then handle frontmatter and body accordingly.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if operation fails
+    fn handle_rendered(&self, rendered: &str) -> Result<GenResult> {
+        let (frontmatter, body) = parse_template(&rendered)?;
+        self.handle_frontmatter_and_body(frontmatter,&body)
     }
 
     /// Handle frontmatter and body
