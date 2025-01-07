@@ -185,22 +185,26 @@ pub struct RRgen {
 impl Default for RRgen {
     fn default() -> Self {
         #[cfg(feature = "tera")]
-        let mut tera_instance = Tera::default();
-        #[cfg(feature = "tera")]
-        tera_filters::register_all(&mut tera_instance);
+        let tera = {
+            let mut tera_instance = Tera::default();
+            tera_filters::register_all(&mut tera_instance);
+            tera_instance
+        };
 
         #[cfg(feature = "minijinja")]
-        let mut minijinja = Environment::new();
-        minijinja.set_keep_trailing_newline(true);
-        #[cfg(feature = "minijinja")]
-        minijinja_filters::register_all(&mut minijinja);
+        let minijinja = {
+            let mut minijinja = Environment::new();
+            minijinja.set_keep_trailing_newline(true);
+            minijinja_filters::register_all(&mut minijinja);
+            minijinja
+        };
 
         Self {
             working_dir: None,
             fs: Box::new(RealFsDriver {}),
             printer: Box::new(ConsolePrinter {}),
             #[cfg(feature = "tera")]
-            tera: tera_instance,
+            tera,
             #[cfg(feature = "minijinja")]
             minijinja,
         }
