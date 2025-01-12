@@ -1,9 +1,9 @@
-// Both struct should be injected
+// First struct should be injected
 
 pub struct HelloWorld {
   //fields
 }
 
-pub struct HelloWorld2 {
+pub struct World2 {
   //fields
 }

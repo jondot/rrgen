@@ -25,6 +25,13 @@ injections:
   content: "Hello"
   before_last: "World"
   inline: true
+- into: tests/fixtures/test1/generated/before_all_inline.txt
+  content: "Hello"
+  after: "World"
+  inline: true
+- into: tests/fixtures/test1/generated/before_all.txt
+  content: "//fields"
+  after: "pub struct"
 - into: tests/fixtures/test1/generated/after.txt
   content: "field: integer"
   after: "pub class"
@@ -42,6 +49,13 @@ injections:
   content: "World"
   after: "Hello"
   inline: true
+- into: tests/fixtures/test1/generated/after_all_inline.txt
+  content: "World"
+  after: "Hello"
+  inline: true
+- into: tests/fixtures/test1/generated/after_all.txt
+  content: "  //fields"
+  after: "Hello"
 - into: tests/fixtures/test1/generated/replace.txt
   content: "World"
   replace: "Hello"

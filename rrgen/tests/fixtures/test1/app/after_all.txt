@@ -1,0 +1,7 @@
+// Both struct should be modified
+
+pub struct Hello1 {
+}
+
+pub struct Hello2 {
+}

@@ -1,0 +1,9 @@
+// Both structs should be modified
+
+pub struct HelloWorld1 {
+  //fields
+}
+
+pub struct HelloWorld2 {
+  //fields
+}
