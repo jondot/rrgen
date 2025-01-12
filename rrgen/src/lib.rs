@@ -260,19 +260,37 @@ impl RRgen {
                 } else if injection.append {
                     format!("{file_content}\n{content}")
                 } else if let Some(before) = &injection.before {
-                    let mut lines = file_content.lines().collect::<Vec<_>>();
-                    let pos = lines.iter().position(|ln| before.is_match(ln));
-                    if let Some(pos) = pos {
-                        lines.insert(pos, content);
+                    if injection.inline {
+                        let new_content = before.replace_all(&file_content, |caps: &regex::Captures| {
+                            format!("{}{}", content, &caps[0])
+                        });
+                        new_content.to_string()
+                    } else {
+                        let mut lines = file_content.lines().collect::<Vec<_>>();
+                        let pos = lines.iter().position(|ln| before.is_match(ln));
+                        if let Some(pos) = pos {
+                            lines.insert(pos, content);
+                        }
+                        lines.join("\n")
                     }
-                    lines.join("\n")
                 } else if let Some(before_last) = &injection.before_last {
-                    let mut lines = file_content.lines().collect::<Vec<_>>();
-                    let pos = lines.iter().rposition(|ln| before_last.is_match(ln));
-                    if let Some(pos) = pos {
-                        lines.insert(pos, content);
+                    if injection.inline {
+                        let new_content = if let Some(last) = before_last.find_iter(&file_content).last() {
+                            let mut result = file_content.clone();
+                            result.replace_range(last.start()..last.start(), content);
+                            result
+                        } else {
+                            file_content.clone()
+                        };
+                        new_content
+                    } else {
+                        let mut lines = file_content.lines().collect::<Vec<_>>();
+                        let pos = lines.iter().rposition(|ln| before_last.is_match(ln));
+                        if let Some(pos) = pos {
+                            lines.insert(pos, content);
+                        }
+                        lines.join("\n")
                     }
-                    lines.join("\n")
                 } else if let Some(after) = &injection.after {
                     if injection.inline {
                         let new_content = after.replace_all(&file_content, |caps: &regex::Captures| {
@@ -288,12 +306,23 @@ impl RRgen {
                         lines.join("\n")
                     }
                 } else if let Some(after_last) = &injection.after_last {
-                    let mut lines = file_content.lines().collect::<Vec<_>>();
-                    let pos = lines.iter().rposition(|ln| after_last.is_match(ln));
-                    if let Some(pos) = pos {
-                        lines.insert(pos + 1, content);
+                    if injection.inline {
+                        let new_content = if let Some(last) = after_last.find_iter(&file_content).last() {
+                            let mut result = file_content.clone();
+                            result.replace_range(last.end()..last.end(), content);
+                            result
+                        } else {
+                            file_content.clone()
+                        };
+                        new_content
+                    } else {
+                        let mut lines = file_content.lines().collect::<Vec<_>>();
+                        let pos = lines.iter().rposition(|ln| after_last.is_match(ln));
+                        if let Some(pos) = pos {
+                            lines.insert(pos + 1, content);
+                        }
+                        lines.join("\n")
                     }
-                    lines.join("\n")
                 } else if let Some(remove_lines) = &injection.remove_lines {
                     let lines = file_content
                         .lines()

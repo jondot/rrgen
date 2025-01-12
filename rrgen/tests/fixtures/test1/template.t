@@ -14,15 +14,27 @@ injections:
 - into: tests/fixtures/test1/generated/before.txt
   content: "// doc comment"
   before: "pub class"
+- into: tests/fixtures/test1/generated/before_inline.txt
+  content: "Hello"
+  before: "World"
+  inline: true
 - into: tests/fixtures/test1/generated/before_last.txt
   content: "before-last"
   before_last: "\\]"
+- into: tests/fixtures/test1/generated/before_last_inline.txt
+  content: "Hello"
+  before_last: "World"
+  inline: true
 - into: tests/fixtures/test1/generated/after.txt
   content: "field: integer"
   after: "pub class"
 - into: tests/fixtures/test1/generated/after_last.txt
   content: "field: integer"
   after_last: "\\{"
+- into: tests/fixtures/test1/generated/after_last_inline.txt
+  content: "World"
+  inline: true
+  after_last: "Hello"
 - into: tests/fixtures/test1/generated/remove_lines.txt
   content: ""
   remove_lines: "Delete this line"
