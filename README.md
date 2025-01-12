@@ -70,3 +70,92 @@ rrgen.generate(
 
 `vars` will be variables that are exposed both for the _frontmatter_ part and the _body_ part.
 
+## Injection Types
+
+The `rrgen` microframework supports various types of injections to modify existing files or generate new content. Below are the supported injection types and their descriptions:
+
+### Prepend
+
+- **Description**: Adds content at the beginning of the target file.
+- **Usage**:
+```yaml
+- into: path/to/target/file.txt
+  prepend: true
+  content: "Content to prepend"
+```
+    
+### Append
+- **Description**: Adds content at the end of the target file.
+- **Usage**:
+```yaml
+- into: path/to/target/file.txt
+  append: true
+  content: "Content to append"
+```
+
+### Skip If
+- **Description**: Skips the injection if the specified condition is met.
+- **Usage**:
+```yaml
+- into: path/to/target/file.txt
+  skip_if: "Condition to skip"
+  append: true
+  content: "Content to append"
+```
+  
+### Before
+- **Description**: Inserts content before a specified pattern in the target file.
+- **Usage**:
+```yaml
+- into: path/to/target/file.txt
+  content: "Content to insert"
+  before: "Pattern to match"
+  inline: true # Optional, inserts content inline before the pattern
+```
+### Before Last
+- **Description**: Inserts content before the last occurrence of a specified pattern in the target file.
+- **Usage**:
+```yaml
+- into: path/to/target/file.txt
+  content: "Content to insert"
+  before_last: "Pattern to match"
+  inline: true # Optional, inserts content inline before the last occurrence of pattern
+```
+  
+### After
+- **Description**: Inserts content after a specified pattern in the target file.
+- **Usage**:
+```yaml
+- into: path/to/target/file.txt
+  content: "Content to insert"
+  after: "Pattern to match"
+  inline: true # Optional, inserts content inline after the pattern
+```
+  
+### After Last
+- **Description**: Inserts content after the last occurrence of a specified pattern in the target file.
+- **Usage**:
+```yaml
+- into: path/to/target/file.txt
+  content: "Content to insert"
+  after_last: "Pattern to match"
+  inline: true # Optional, inserts content inline after the last occurrence of the pattern
+```
+  
+### Remove Lines
+- **Description**: Removes lines that match a specified pattern in the target file.
+- **Usage**:
+```yaml
+- into: path/to/target/file.txt
+  content: ""
+  remove_lines: "Pattern to match"
+```
+
+### Replace
+- **Description**: Replaces a specified pattern with the provided content in the target file.
+- **Usage**:
+```yaml
+- into: path/to/target/file.txt
+  content: "Content to replace"
+  replace: "Pattern to match"
+```
