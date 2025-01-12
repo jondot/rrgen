@@ -89,6 +89,9 @@ struct Injection {
     into: String,
     content: String,
 
+    #[serde(default)]
+    inline: bool,
+
     #[serde(with = "serde_regex")]
     #[serde(default)]
     skip_if: Option<Regex>,
@@ -112,6 +115,10 @@ struct Injection {
     #[serde(with = "serde_regex")]
     #[serde(default)]
     remove_lines: Option<Regex>,
+
+    #[serde(with = "serde_regex")]
+    #[serde(default)]
+    replace: Option<Regex>,
 
     #[serde(default)]
     prepend: bool,
@@ -267,12 +274,19 @@ impl RRgen {
                     }
                     lines.join("\n")
                 } else if let Some(after) = &injection.after {
-                    let mut lines = file_content.lines().collect::<Vec<_>>();
-                    let pos = lines.iter().position(|ln| after.is_match(ln));
-                    if let Some(pos) = pos {
-                        lines.insert(pos + 1, content);
+                    if injection.inline {
+                        let new_content = after.replace_all(&file_content, |caps: &regex::Captures| {
+                            format!("{}{}", &caps[0], content)
+                        });
+                        new_content.to_string()
+                    } else {
+                        let mut lines = file_content.lines().collect::<Vec<_>>();
+                        let pos = lines.iter().position(|ln| after.is_match(ln));
+                        if let Some(pos) = pos {
+                            lines.insert(pos + 1, content);
+                        }
+                        lines.join("\n")
                     }
-                    lines.join("\n")
                 } else if let Some(after_last) = &injection.after_last {
                     let mut lines = file_content.lines().collect::<Vec<_>>();
                     let pos = lines.iter().rposition(|ln| after_last.is_match(ln));
@@ -286,6 +300,8 @@ impl RRgen {
                         .filter(|line| !remove_lines.is_match(line))
                         .collect::<Vec<_>>();
                     lines.join("\n")
+                } else if let Some(replace) = &injection.replace {
+                    replace.replace_all(&file_content, content.as_str()).to_string()
                 } else {
                     println!("warning: no injection made");
                     file_content.clone()

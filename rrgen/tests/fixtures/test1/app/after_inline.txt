@@ -1,0 +1,6 @@
+
+// This should be injected with world after hello
+
+pub struct Hello {
+  pub name: String,
+}
