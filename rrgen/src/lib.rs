@@ -3,6 +3,8 @@ use crate::MatchPositions::{All, First, Last};
 use regex::Regex;
 use serde::Deserialize;
 use tera::{Context, Tera};
+#[cfg(test)]
+mod tests;
 
 mod tera_filters;
 pub trait FsDriver {
@@ -311,14 +313,14 @@ impl RRgen {
         })
     }
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum MatchPositions {
     All,
     First,
     Last,
 }
 
-fn find_positions(lines: Vec<String>, regex: &Regex, input: MatchPositions) -> Vec<usize> {
+fn find_positions(lines: Vec<String>, regex: &Regex, input: &MatchPositions) -> Vec<usize> {
     let matching_positions: Vec<usize> = lines
         .iter()
         .enumerate()
@@ -345,21 +347,30 @@ fn insert_content_at_positions(
     match_positions: MatchPositions,
     position: InsertionPoint,
 ) -> String {
-    let lines: Vec<String> = file_content.lines().into_iter().map(String::from).collect();
-    let positions = find_positions(lines.clone(), regex, match_positions);
+    let lines: Vec<String> = file_content.split('\n').map(|line| line.to_string()).collect();
+    let positions = find_positions(lines.clone(), regex, &match_positions);
+
+    let replace_with = |caps: &regex::Captures| {
+        match position {
+            InsertionPoint::Before => format!("{}{}", content, &caps[0]),
+            InsertionPoint::After => format!("{}{}", &caps[0], content),
+        }
+    };
 
     let new_lines = lines.iter()
         .enumerate()
         .flat_map(|(index,line)| {
         if regex.is_match(line) && positions.contains(&index) {
             if inline {
-                let new_line = regex.replace_all(line,
-                if matches!(position, InsertionPoint::Before) {
-                        format!("{}$0", content)
-                    } else {
-                        format!("$0{}", content)
-                    },
-                ).to_string();
+                let new_line = match match_positions {
+                    MatchPositions::All => regex.replace_all(line, replace_with).to_string(),
+                    MatchPositions::First => regex.replace(line, replace_with).to_string(),
+                    MatchPositions::Last => {
+                        let count = regex.find_iter(line).count();
+                        regex.replacen(line, count, replace_with).to_string()
+                    }
+                };
+                println!("new_line: {:?}", new_line);
                 vec![new_line]
             } else {
                 if matches!(position, InsertionPoint::Before) {
@@ -372,307 +383,6 @@ fn insert_content_at_positions(
             vec![line.to_string()]
         }
     }).collect::<Vec<String>>();
+    println!("new_lines: {:?}", new_lines);
     new_lines.join("\n")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use regex::Regex;
-
-    #[test]
-    fn test_insert_content_at_positions_first_before() {
-        let file_content = r#"
-pub struct Hello1 {}
-pub struct Hello2 {}
-"#;
-        let content = "// New content";
-        let regex = Regex::new(r"Hello").unwrap();
-        let result = insert_content_at_positions(
-            file_content,
-            content,
-            false,
-            &regex,
-            MatchPositions::First,
-            InsertionPoint::Before,
-        );
-
-        let expected = r#"
-// New content
-pub struct Hello1 {}
-pub struct Hello2 {}
-"#;
-        assert_eq!(result, expected);
-    }
-
-    #[test]
-    fn test_insert_content_at_positions_first_after() {
-        let file_content = r#"
-pub struct Hello1 {}
-pub struct Hello2 {}
-"#;
-        let content = "// New content";
-        let regex = Regex::new(r"Hello").unwrap();
-        let result = insert_content_at_positions(
-            file_content,
-            content,
-            false,
-            &regex,
-            MatchPositions::First,
-            InsertionPoint::After,
-        );
-
-        let expected = r#"
-pub struct Hello1 {}
-// New content
-pub struct Hello2 {}
-"#;
-        assert_eq!(result, expected);
-    }
-
-    #[test]
-    fn test_insert_content_at_positions_last_before() {
-        let file_content = r#"
-pub struct Hello1 {}
-pub struct Hello2 {}
-"#;
-        let content = "// New content";
-        let regex = Regex::new(r"Hello").unwrap();
-        let result = insert_content_at_positions(
-            file_content,
-            content,
-            false,
-            &regex,
-            MatchPositions::Last,
-            InsertionPoint::Before,
-        );
-
-        let expected = r#"
-pub struct Hello1 {}
-// New content
-pub struct Hello2 {}
-"#;
-        assert_eq!(result, expected);
-    }
-
-    #[test]
-    fn test_insert_content_at_positions_last_after() {
-        let file_content = r#"
-pub struct Hello1 {}
-pub struct Hello2 {}
-"#;
-        let content = "// New content";
-        let regex = Regex::new(r"Hello").unwrap();
-        let result = insert_content_at_positions(
-            file_content,
-            content,
-            false,
-            &regex,
-            MatchPositions::Last,
-            InsertionPoint::After,
-        );
-
-        let expected = r#"
-pub struct Hello1 {}
-pub struct Hello2 {}
-// New content
-"#;
-        assert_eq!(result, expected);
-    }
-
-    #[test]
-    fn test_insert_content_at_positions_all_before() {
-        let file_content = r#"
-pub struct Hello1 {}
-pub struct Hello2 {}
-"#;
-        let content = "// New content";
-        let regex = Regex::new(r"Hello").unwrap();
-        let result = insert_content_at_positions(
-            file_content,
-            content,
-            false,
-            &regex,
-            MatchPositions::All,
-            InsertionPoint::Before,
-        );
-
-        let expected = r#"
-// New content
-pub struct Hello1 {}
-// New content
-pub struct Hello2 {}
-"#;
-        assert_eq!(result, expected);
-    }
-
-    #[test]
-    fn test_insert_content_at_positions_all_after() {
-        let file_content = r#"
-pub struct Hello1 {}
-pub struct Hello2 {}
-"#;
-        let content = "// New content";
-        let regex = Regex::new(r"Hello").unwrap();
-        let result = insert_content_at_positions(
-            file_content,
-            content,
-            false,
-            &regex,
-            MatchPositions::All,
-            InsertionPoint::After,
-        );
-
-        let expected = r#"
-pub struct Hello1 {}
-// New content
-pub struct Hello2 {}
-// New content
-"#;
-        assert_eq!(result, expected);
-    }
-
-    #[test]
-    fn test_insert_content_at_positions_inline_first_before() {
-        let file_content = r#"
-pub struct World1 {}
-pub struct World2 {}
-"#;
-        let content = "Hello";
-        let regex = Regex::new(r"World").unwrap();
-        let result = insert_content_at_positions(
-            file_content,
-            content,
-            true,
-            &regex,
-            MatchPositions::First,
-            InsertionPoint::Before,
-        );
-
-        let expected = r#"
-pub struct HelloWorld1 {}
-pub struct World2 {}
-"#;
-        assert_eq!(result, expected);
-    }
-
-    #[test]
-    fn test_insert_content_at_positions_inline_first_after() {
-        let file_content = r#"
-pub struct Hello1 {}
-pub struct Hello2 {}
-"#;
-        let content = "World";
-        let regex = Regex::new(r"Hello").unwrap();
-        let result = insert_content_at_positions(
-            file_content,
-            content,
-            true,
-            &regex,
-            MatchPositions::First,
-            InsertionPoint::After,
-        );
-
-        let expected = r#"
-pub struct HelloWorld1 {}
-pub struct Hello2 {}
-"#;
-        assert_eq!(result, expected);
-    }
-
-    #[test]
-    fn test_insert_content_at_positions_inline_last_before() {
-        let file_content = r#"
-pub struct World1 {}
-pub struct World2 {}
-"#;
-        let content = "Hello";
-        let regex = Regex::new(r"World").unwrap();
-        let result = insert_content_at_positions(
-            file_content,
-            content,
-            true,
-            &regex,
-            MatchPositions::Last,
-            InsertionPoint::Before,
-        );
-
-        let expected = r#"
-pub struct World1 {}
-pub struct HelloWorld2 {}
-"#;
-        assert_eq!(result, expected);
-    }
-
-    #[test]
-    fn test_insert_content_at_positions_inline_last_after() {
-        let file_content = r#"
-pub struct Hello1 {}
-pub struct Hello2 {}
-"#;
-        let content = "World";
-        let regex = Regex::new(r"Hello").unwrap();
-        let result = insert_content_at_positions(
-            file_content,
-            content,
-            true,
-            &regex,
-            MatchPositions::Last,
-            InsertionPoint::After,
-        );
-
-        let expected = r#"
-pub struct Hello1 {}
-pub struct HelloWorld2 {}
-"#;
-        assert_eq!(result, expected);
-    }
-
-    #[test]
-    fn test_insert_content_at_positions_inline_all_before() {
-        let file_content = r#"
-pub struct World1 {}
-pub struct World2 {}
-"#;
-        let content = "Hello";
-        let regex = Regex::new(r"World").unwrap();
-        let result = insert_content_at_positions(
-            file_content,
-            content,
-            true,
-            &regex,
-            MatchPositions::All,
-            InsertionPoint::Before,
-        );
-
-        let expected = r#"
-pub struct HelloWorld1 {}
-pub struct HelloWorld2 {}
-"#;
-        assert_eq!(result, expected);
-    }
-
-    #[test]
-    fn test_insert_content_at_positions_inline_all_after() {
-        let file_content = r#"
-pub struct Hello1 {}
-pub struct Hello2 {}
-"#;
-        let content = "World";
-        let regex = Regex::new(r"Hello").unwrap();
-        let result = insert_content_at_positions(
-            file_content,
-            content,
-            true,
-            &regex,
-            MatchPositions::All,
-            InsertionPoint::After,
-        );
-
-        let expected = r#"
-pub struct HelloWorld1 {}
-pub struct HelloWorld2 {}
-"#;
-        assert_eq!(result, expected);
-    }
 }

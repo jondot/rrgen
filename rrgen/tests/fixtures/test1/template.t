@@ -27,11 +27,11 @@ injections:
   inline: true
 - into: tests/fixtures/test1/generated/before_all_inline.txt
   content: "Hello"
-  after: "World"
+  before_all: "World"
   inline: true
 - into: tests/fixtures/test1/generated/before_all.txt
   content: "//fields"
-  after: "pub struct"
+  before_all: "pub struct"
 - into: tests/fixtures/test1/generated/after.txt
   content: "field: integer"
   after: "pub class"
@@ -51,11 +51,11 @@ injections:
   inline: true
 - into: tests/fixtures/test1/generated/after_all_inline.txt
   content: "World"
-  after: "Hello"
+  after_all: "Hello"
   inline: true
 - into: tests/fixtures/test1/generated/after_all.txt
   content: "  //fields"
-  after: "Hello"
+  after_all: "Hello"
 - into: tests/fixtures/test1/generated/replace.txt
   content: "World"
   replace: "Hello"

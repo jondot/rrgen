@@ -1,4 +1,4 @@
-// Both struct should be injected
+// First struct should be injected
 
 pub struct World {
   //fields

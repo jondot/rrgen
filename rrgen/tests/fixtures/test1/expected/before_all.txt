@@ -1,9 +1,9 @@
 // Both struct should be injected
 
+//fields
 pub struct World {
-  //fields
 }
 
+//fields
 pub struct World2 {
-  //fields
 }
