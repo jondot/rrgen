@@ -304,7 +304,6 @@ impl RRgen {
                     file_content.clone()
                 };
 
-                println!("new_content: {:?}", new_content);
                 self.fs.write_file(&injection_to, &new_content)?;
                 self.printer.injected(&injection_to);
             }
@@ -348,17 +347,8 @@ fn insert_content_at_positions(
     match_positions: MatchPositions,
     position: InsertionPoint,
 ) -> String {
-    println!("file_content: {}", file_content);
-    println!("content: {}", content);
-    println!("regex: {:?}", regex);
-    println!("inline: {:?}", inline);
-    println!("match_positions: {:?}", match_positions);
-    println!("position: {:?}", position);
-    let lines: Vec<String> = file_content.split('\n').map(|line| line.to_string()).collect();
     let lines = file_content.lines().collect::<Vec<_>>();
     let positions = find_positions(lines.clone(), regex, &match_positions);
-    println!("positions: {:?}", positions);
-    println!("lines: {:?}", lines);
 
     let replace_with = |caps: &regex::Captures| {
         match position {
