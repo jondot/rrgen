@@ -112,8 +112,19 @@ The `rrgen` microframework supports various types of injections to modify existi
   before: "Pattern to match"
   inline: true # Optional, inserts content inline before the pattern
 ```
+
 ### Before Last
 - **Description**: Inserts content before the last occurrence of a specified pattern in the target file.
+- **Usage**:
+```yaml
+- into: path/to/target/file.txt
+  content: "Content to insert"
+  before_last: "Pattern to match"
+  inline: true # Optional, inserts content inline before the last occurrence of pattern
+```
+  
+### Before All
+- **Description**: Inserts content before all the occurrences of a specified pattern in the target file.
 - **Usage**:
 ```yaml
 - into: path/to/target/file.txt
@@ -141,6 +152,16 @@ The `rrgen` microframework supports various types of injections to modify existi
   after_last: "Pattern to match"
   inline: true # Optional, inserts content inline after the last occurrence of the pattern
 ```
+
+### After Last
+- **Description**: Inserts content after the all occurrences of a specified pattern in the target file.
+- **Usage**:
+```yaml
+- into: path/to/target/file.txt
+  content: "Content to insert"
+  after_last: "Pattern to match"
+  inline: true # Optional, inserts content inline after the last occurrence of the pattern
+```
   
 ### Remove Lines
 - **Description**: Removes lines that match a specified pattern in the target file.
@@ -158,4 +179,13 @@ The `rrgen` microframework supports various types of injections to modify existi
 - into: path/to/target/file.txt
   content: "Content to replace"
   replace: "Pattern to match"
+```
+
+### Replace All
+- **Description**: Replaces all occurrences of a specified pattern with the provided content in the target file.
+- **Usage**:
+```yaml
+- into: path/to/target/file.txt
+  content: "Content to replace"
+  replace_all: "Pattern to match"
 ```

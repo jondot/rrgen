@@ -1,4 +1,4 @@
-// first hello should be replaced with world
+// both hello should be replaced with world
 
 pub struct Hello {
   pub name: String,

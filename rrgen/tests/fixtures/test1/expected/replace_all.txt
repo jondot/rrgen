@@ -1,9 +1,9 @@
-// first hello should be replaced with world
+// both hello should be replaced with world
 
 pub struct World {
   pub name: String,
 }
 
-pub struct Hello {
+pub struct World {
   pub name: String,
 }

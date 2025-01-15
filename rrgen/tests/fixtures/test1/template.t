@@ -59,6 +59,9 @@ injections:
 - into: tests/fixtures/test1/generated/replace.txt
   content: "World"
   replace: "Hello"
+- into: tests/fixtures/test1/generated/replace_all.txt
+  content: "World"
+  replace_all: "Hello"
 ---
 
 hello, this is the file body.

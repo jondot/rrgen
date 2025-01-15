@@ -5,4 +5,5 @@ pub struct Hello1 {
 }
 
 pub struct Hello2 {
+  //fields
 }
