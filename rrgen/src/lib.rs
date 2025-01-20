@@ -159,14 +159,18 @@ pub struct RRgen {
     working_dir: Option<PathBuf>,
     fs: Box<dyn FsDriver>,
     printer: Box<dyn Printer>,
+    template_engine: Tera,
 }
 
 impl Default for RRgen {
     fn default() -> Self {
+        let mut tera = Tera::default();
+        tera_filters::register_all(&mut tera);
         Self {
             working_dir: None,
             fs: Box::new(RealFsDriver {}),
             printer: Box::new(ConsolePrinter {}),
+            template_engine: tera,
         }
     }
 }
@@ -189,14 +193,32 @@ impl RRgen {
         }
     }
 
+    /// Adds a custom template engine to the generator.
+    ///
+    /// ```rust
+    /// use rrgen::RRgen;
+    /// use tera::Tera;
+    ///
+    /// let mut tera = Tera::default();
+    /// let rgen = RRgen::default().add_template_engine(tera);
+    ///
+    /// ```
+    #[must_use]
+    pub fn add_template_engine(self, mut template_engine: Tera) -> Self {
+        tera_filters::register_all(&mut template_engine);
+        Self {
+            template_engine,
+            ..self
+        }
+    }
+
     /// Generate from a template contained in `input`
     ///
     /// # Errors
     ///
     /// This function will return an error if operation fails
     pub fn generate(&self, input: &str, vars: &serde_json::Value) -> Result<GenResult> {
-        let mut tera = Tera::default();
-        tera_filters::register_all(&mut tera);
+        let mut tera: Tera = self.template_engine.clone();
         let rendered = tera.render_str(input, &Context::from_serialize(vars.clone())?)?;
         let (frontmatter, body) = parse_template(&rendered)?;
 
