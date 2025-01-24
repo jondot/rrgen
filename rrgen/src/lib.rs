@@ -176,10 +176,11 @@ pub struct RRgen {
     working_dir: Option<PathBuf>,
     fs: Box<dyn FsDriver>,
     printer: Box<dyn Printer>,
+
     #[cfg(feature = "tera")]
-    tera: Tera,
+    template_engine: Tera,
     #[cfg(feature = "minijinja")]
-    minijinja: Environment<'static>,
+    template_engine: Environment<'static>,
 }
 
 impl Default for RRgen {
@@ -204,9 +205,9 @@ impl Default for RRgen {
             fs: Box::new(RealFsDriver {}),
             printer: Box::new(ConsolePrinter {}),
             #[cfg(feature = "tera")]
-            tera,
+            template_engine: tera,
             #[cfg(feature = "minijinja")]
-            minijinja,
+            template_engine: minijinja,
         }
     }
 }
@@ -226,6 +227,25 @@ impl RRgen {
         Self {
             working_dir: Some(path.as_ref().to_path_buf()),
             ..Default::default()
+        }
+    }
+
+    /// Adds a custom template engine to the generator.
+    ///
+    /// ```rust
+    /// use rrgen::RRgen;
+    /// use tera::Tera;
+    ///
+    /// let mut tera = Tera::default();
+    /// let rgen = RRgen::default().add_template_engine(tera);
+    ///
+    /// ```
+    #[must_use]
+    pub fn add_template_engine(self, mut template_engine: Tera) -> Self {
+        tera_filters::register_all(&mut template_engine);
+        Self {
+            template_engine,
+            ..self
         }
     }
 
@@ -269,7 +289,7 @@ impl RRgen {
     fn add_template(&mut self, name: &str, template: &str) -> Result<()> {
         #[cfg(feature = "tera")]
         {
-            self.tera.add_raw_template(name, template)?
+            self.template_engine.add_raw_template(name, template)?
         }
         #[cfg(feature = "minijinja")]
         {
@@ -287,7 +307,7 @@ impl RRgen {
     pub fn generate(&self, input: &str, vars: &serde_json::Value) -> Result<GenResult> {
         #[cfg(feature = "tera")]
         {
-            let mut tera = self.tera.clone();
+            let mut tera = self.template_engine.clone();
             let rendered = tera.render_str(input, &Context::from_serialize(vars.clone())?)?;
             self.handle_rendered(&rendered)
         }
@@ -311,7 +331,7 @@ impl RRgen {
         #[cfg(feature = "tera")]
         {
             let rendered = self
-                .tera
+                .template_engine
                 .render(name, &Context::from_serialize(vars.clone())?)?;
             self.handle_rendered(&rendered)
         }
