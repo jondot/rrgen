@@ -4,12 +4,12 @@ compile_error!("You cannot enable both 'tera' and 'minijinja' at the same time."
 #[cfg(not(any(feature = "tera", feature = "minijinja")))]
 compile_error!("You must enable exactly one feature: 'tera' or 'minijinja'.");
 
-use std::path::{Path, PathBuf};
-
 #[cfg(feature = "minijinja")]
 use minijinja::Environment;
 use regex::Regex;
 use serde::Deserialize;
+use serde_json::Value;
+use std::path::{Path, PathBuf};
 #[cfg(feature = "tera")]
 use tera::{Context, Tera};
 
@@ -176,11 +176,7 @@ pub struct RRgen {
     working_dir: Option<PathBuf>,
     fs: Box<dyn FsDriver>,
     printer: Box<dyn Printer>,
-
-    #[cfg(feature = "tera")]
-    template_engine: Tera,
-    #[cfg(feature = "minijinja")]
-    template_engine: Environment<'static>,
+    template_engine: Box<dyn TemplateEngine>,
 }
 
 impl Default for RRgen {
@@ -189,7 +185,7 @@ impl Default for RRgen {
         let tera = {
             let mut tera_instance = Tera::default();
             tera_filters::register_all(&mut tera_instance);
-            tera_instance
+            Box::new(tera_instance) as Box<dyn TemplateEngine>
         };
 
         #[cfg(feature = "minijinja")]
@@ -197,7 +193,7 @@ impl Default for RRgen {
             let mut minijinja = Environment::new();
             minijinja.set_keep_trailing_newline(true);
             minijinja_filters::register_all(&mut minijinja);
-            minijinja
+            Box::new(minijinja) as Box<dyn TemplateEngine>
         };
 
         Self {
@@ -209,6 +205,56 @@ impl Default for RRgen {
             #[cfg(feature = "minijinja")]
             template_engine: minijinja,
         }
+    }
+}
+
+pub trait TemplateEngine {
+    fn register_all_filters(&mut self);
+    fn add_template(&mut self, name: &str, template: &str) -> Result<()>;
+    fn render_string(&self, input: &str, vars: &Value) -> Result<String>;
+    fn render_template_with_name(&self, name: &str, vars: &Value) -> Result<String>;
+}
+
+#[cfg(feature = "tera")]
+impl TemplateEngine for Tera {
+    fn register_all_filters(&mut self) {
+        tera_filters::register_all(self);
+    }
+
+    fn add_template(&mut self, name: &str, template: &str) -> Result<()> {
+        self.add_raw_template(name, template)?;
+        Ok(())
+    }
+
+    fn render_string(&self, input: &str, vars: &Value) -> Result<String> {
+        Ok(self
+            .clone()
+            .render_str(input, &Context::from_serialize(vars.clone())?)?)
+    }
+
+    fn render_template_with_name(&self, name: &str, vars: &Value) -> Result<String> {
+        Ok(self.render(name, &Context::from_serialize(vars.clone())?)?)
+    }
+}
+
+#[cfg(feature = "minijinja")]
+impl TemplateEngine for Environment<'static> {
+    fn register_all_filters(&mut self) {
+        minijinja_filters::register_all(self);
+    }
+
+    fn add_template(&mut self, name: &str, template: &str) -> Result<()> {
+        self.add_template_owned(name.to_string(), template.to_string())?;
+        Ok(())
+    }
+
+    fn render_string(&self, input: &str, vars: &Value) -> Result<String> {
+        Ok(self.render_str(input, vars.clone())?)
+    }
+
+    fn render_template_with_name(&self, name: &str, vars: &Value) -> Result<String> {
+        let template = self.get_template(name);
+        Ok(template?.render(vars)?)
     }
 }
 
@@ -230,19 +276,10 @@ impl RRgen {
         }
     }
 
-    /// Adds a custom template engine to the generator.
-    ///
-    /// ```rust
-    /// use rrgen::RRgen;
-    /// use tera::Tera;
-    ///
-    /// let mut tera = Tera::default();
-    /// let rgen = RRgen::default().add_template_engine(tera);
-    ///
-    /// ```
     #[must_use]
-    pub fn add_template_engine(self, mut template_engine: Tera) -> Self {
-        tera_filters::register_all(&mut template_engine);
+    pub fn add_template_engine(self, mut template_engine: impl TemplateEngine + 'static) -> Self {
+        template_engine.register_all_filters();
+        let template_engine = Box::new(template_engine);
         Self {
             template_engine,
             ..self
@@ -287,16 +324,7 @@ impl RRgen {
     ///
     /// This function will return an error if operation fails
     fn add_template(&mut self, name: &str, template: &str) -> Result<()> {
-        #[cfg(feature = "tera")]
-        {
-            self.template_engine.add_raw_template(name, template)?
-        }
-        #[cfg(feature = "minijinja")]
-        {
-            self.minijinja
-                .add_template_owned(name.to_string(), template.to_string())?
-        }
-        Ok(())
+        self.template_engine.add_template(name, template)
     }
 
     /// Generate from a template contained in `input`
@@ -304,18 +332,9 @@ impl RRgen {
     /// # Errors
     ///
     /// This function will return an error if operation fails
-    pub fn generate(&self, input: &str, vars: &serde_json::Value) -> Result<GenResult> {
-        #[cfg(feature = "tera")]
-        {
-            let mut tera = self.template_engine.clone();
-            let rendered = tera.render_str(input, &Context::from_serialize(vars.clone())?)?;
-            self.handle_rendered(&rendered)
-        }
-        #[cfg(feature = "minijinja")]
-        {
-            let rendered = self.minijinja.render_str(input, vars.clone())?;
-            self.handle_rendered(&rendered)
-        }
+    pub fn generate(&self, input: &str, vars: &Value) -> Result<GenResult> {
+        let rendered = self.template_engine.render_string(input, vars)?;
+        self.handle_rendered(&rendered)
     }
 
     /// Generate from a template added in the template engine given by `name`
@@ -323,25 +342,11 @@ impl RRgen {
     /// # Errors
     ///
     /// This function will return an error if operation fails
-    pub fn generate_by_template_with_name(
-        &self,
-        name: &str,
-        vars: &serde_json::Value,
-    ) -> Result<GenResult> {
-        #[cfg(feature = "tera")]
-        {
-            let rendered = self
-                .template_engine
-                .render(name, &Context::from_serialize(vars.clone())?)?;
-            self.handle_rendered(&rendered)
-        }
-
-        #[cfg(feature = "minijinja")]
-        {
-            let template = self.minijinja.get_template(name);
-            let rendered = template?.render(vars)?;
-            self.handle_rendered(rendered.as_str())
-        }
+    pub fn generate_by_template_with_name(&self, name: &str, vars: &Value) -> Result<GenResult> {
+        let render = self
+            .template_engine
+            .render_template_with_name(name, &vars)?;
+        self.handle_rendered(&render)
     }
 
     /// Handle rendered string by splitting to frontmatter and body and then handle frontmatter and body accordingly.
