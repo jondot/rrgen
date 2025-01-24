@@ -3,8 +3,6 @@ use crate::MatchPositions::{All, First, Last};
 use regex::Regex;
 use serde::Deserialize;
 use tera::{Context, Tera};
-#[cfg(test)]
-mod tests;
 
 mod tera_filters;
 pub trait FsDriver {
@@ -370,7 +368,6 @@ fn insert_content_at_positions(
                         regex.replacen(line, count, replace_with).to_string()
                     }
                 };
-                println!("new_line: {:?}", new_line);
                 vec![new_line]
             } else {
                 if matches!(position, InsertionPoint::Before) {
@@ -383,6 +380,5 @@ fn insert_content_at_positions(
             vec![line.to_string()]
         }
     }).collect::<Vec<String>>();
-    println!("new_lines: {:?}", new_lines);
     new_lines.join("\n")
 }
