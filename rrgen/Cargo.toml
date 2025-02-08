@@ -30,7 +30,7 @@ regex = "1"
 serde_regex = "1.1"
 fs-err = "3.1"
 glob = "0.3"
-minijinja = { version = "2.6", features = ["default", "loop_controls","loader"], optional = true }
+minijinja = { version = "2.7", features = ["default", "loop_controls","loader"], optional = true }
 
 [dev-dependencies]
 insta = "1"
