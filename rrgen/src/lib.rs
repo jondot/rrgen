@@ -1,10 +1,23 @@
-use std::path::{Path, PathBuf};
+#[cfg(all(feature = "tera", feature = "minijinja"))]
+compile_error!("You cannot enable both 'tera' and 'minijinja' at the same time.");
 
+#[cfg(not(any(feature = "tera", feature = "minijinja")))]
+compile_error!("You must enable exactly one feature: 'tera' or 'minijinja'.");
+
+#[cfg(feature = "minijinja")]
+use minijinja::Environment;
 use regex::Regex;
 use serde::Deserialize;
+use serde_json::Value;
+use std::path::{Path, PathBuf};
+#[cfg(feature = "tera")]
 use tera::{Context, Tera};
 
+#[cfg(feature = "minijinja")]
+mod minijinja_filters;
+#[cfg(feature = "tera")]
 mod tera_filters;
+
 pub trait FsDriver {
     /// Write a file
     ///
@@ -84,7 +97,7 @@ struct FrontMatter {
     injections: Option<Vec<Injection>>,
 }
 
-#[derive(Deserialize, Debug, Default)]
+#[derive(Deserialize, Debug, Default, Clone)]
 struct Injection {
     into: String,
     content: String,
@@ -124,8 +137,12 @@ struct Injection {
 pub enum Error {
     #[error("{0}")]
     Message(String),
+    #[cfg(feature = "tera")]
     #[error(transparent)]
     Tera(#[from] tera::Error),
+    #[cfg(feature = "minijinja")]
+    #[error(transparent)]
+    MiniJinja(#[from] minijinja::Error),
     #[error(transparent)]
     IO(#[from] std::io::Error),
     #[error(transparent)]
@@ -159,19 +176,85 @@ pub struct RRgen {
     working_dir: Option<PathBuf>,
     fs: Box<dyn FsDriver>,
     printer: Box<dyn Printer>,
-    template_engine: Tera,
+    template_engine: Box<dyn TemplateEngine>,
 }
 
 impl Default for RRgen {
     fn default() -> Self {
-        let mut tera = Tera::default();
-        tera_filters::register_all(&mut tera);
+        #[cfg(feature = "tera")]
+        let tera = {
+            let mut tera_instance = Tera::default();
+            tera_filters::register_all(&mut tera_instance);
+            Box::new(tera_instance) as Box<dyn TemplateEngine>
+        };
+
+        #[cfg(feature = "minijinja")]
+        let minijinja = {
+            let mut minijinja = Environment::new();
+            minijinja.set_keep_trailing_newline(true);
+            minijinja_filters::register_all(&mut minijinja);
+            Box::new(minijinja) as Box<dyn TemplateEngine>
+        };
+
         Self {
             working_dir: None,
             fs: Box::new(RealFsDriver {}),
             printer: Box::new(ConsolePrinter {}),
+            #[cfg(feature = "tera")]
             template_engine: tera,
+            #[cfg(feature = "minijinja")]
+            template_engine: minijinja,
         }
+    }
+}
+
+pub trait TemplateEngine {
+    fn register_all_filters(&mut self);
+    fn add_template(&mut self, name: &str, template: &str) -> Result<()>;
+    fn render_string(&self, input: &str, vars: &Value) -> Result<String>;
+    fn render_template_with_name(&self, name: &str, vars: &Value) -> Result<String>;
+}
+
+#[cfg(feature = "tera")]
+impl TemplateEngine for Tera {
+    fn register_all_filters(&mut self) {
+        tera_filters::register_all(self);
+    }
+
+    fn add_template(&mut self, name: &str, template: &str) -> Result<()> {
+        self.add_raw_template(name, template)?;
+        Ok(())
+    }
+
+    fn render_string(&self, input: &str, vars: &Value) -> Result<String> {
+        Ok(self
+            .clone()
+            .render_str(input, &Context::from_serialize(vars.clone())?)?)
+    }
+
+    fn render_template_with_name(&self, name: &str, vars: &Value) -> Result<String> {
+        Ok(self.render(name, &Context::from_serialize(vars.clone())?)?)
+    }
+}
+
+#[cfg(feature = "minijinja")]
+impl TemplateEngine for Environment<'static> {
+    fn register_all_filters(&mut self) {
+        minijinja_filters::register_all(self);
+    }
+
+    fn add_template(&mut self, name: &str, template: &str) -> Result<()> {
+        self.add_template_owned(name.to_string(), template.to_string())?;
+        Ok(())
+    }
+
+    fn render_string(&self, input: &str, vars: &Value) -> Result<String> {
+        Ok(self.render_str(input, vars.clone())?)
+    }
+
+    fn render_template_with_name(&self, name: &str, vars: &Value) -> Result<String> {
+        let template = self.get_template(name);
+        Ok(template?.render(vars)?)
     }
 }
 
@@ -193,23 +276,55 @@ impl RRgen {
         }
     }
 
-    /// Adds a custom template engine to the generator.
-    ///
-    /// ```rust
-    /// use rrgen::RRgen;
-    /// use tera::Tera;
-    ///
-    /// let mut tera = Tera::default();
-    /// let rgen = RRgen::default().add_template_engine(tera);
-    ///
-    /// ```
     #[must_use]
-    pub fn add_template_engine(self, mut template_engine: Tera) -> Self {
-        tera_filters::register_all(&mut template_engine);
+    pub fn add_template_engine(self, mut template_engine: impl TemplateEngine + 'static) -> Self {
+        template_engine.register_all_filters();
+        let template_engine = Box::new(template_engine);
         Self {
             template_engine,
             ..self
         }
+    }
+
+    /// Creates a new `RRgen` instance with the specified templates.
+    ///
+    /// # Example
+    /// ```rust
+    /// use rrgen::RRgen;
+    /// use std::collections::HashMap;
+    ///
+    /// let templates = vec![
+    ///     ("template1", "content of template 1"),
+    ///     ("template2", "content of template 2"),
+    /// ];
+    /// let rgen = RRgen::with_templates(templates).unwrap();
+    ///
+    /// let mut map = HashMap::new();
+    /// map.insert("template3", "content of template 3");
+    /// let rgen = RRgen::with_templates(map).unwrap();
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if operation fails
+    pub fn with_templates<'a, I>(templates: I) -> std::result::Result<Self, Error>
+    where
+        I: IntoIterator<Item = (&'a str, &'a str)>,
+    {
+        let mut rgen = RRgen::default();
+        for (name, content) in templates {
+            rgen.add_template(name, content)?;
+        }
+        Ok(rgen)
+    }
+
+    /// Add template with the given name in template engine
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if operation fails
+    fn add_template(&mut self, name: &str, template: &str) -> Result<()> {
+        self.template_engine.add_template(name, template)
     }
 
     /// Generate from a template contained in `input`
@@ -217,11 +332,43 @@ impl RRgen {
     /// # Errors
     ///
     /// This function will return an error if operation fails
-    pub fn generate(&self, input: &str, vars: &serde_json::Value) -> Result<GenResult> {
-        let mut tera: Tera = self.template_engine.clone();
-        let rendered = tera.render_str(input, &Context::from_serialize(vars.clone())?)?;
-        let (frontmatter, body) = parse_template(&rendered)?;
+    pub fn generate(&self, input: &str, vars: &Value) -> Result<GenResult> {
+        let rendered = self.template_engine.render_string(input, vars)?;
+        self.handle_rendered(&rendered)
+    }
 
+    /// Generate from a template added in the template engine given by `name`
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if operation fails
+    pub fn generate_by_template_with_name(&self, name: &str, vars: &Value) -> Result<GenResult> {
+        let render = self
+            .template_engine
+            .render_template_with_name(name, &vars)?;
+        self.handle_rendered(&render)
+    }
+
+    /// Handle rendered string by splitting to frontmatter and body and then handle frontmatter and body accordingly.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if operation fails
+    fn handle_rendered(&self, rendered: &str) -> Result<GenResult> {
+        let (frontmatter, body) = parse_template(rendered)?;
+        self.handle_frontmatter_and_body(frontmatter, &body)
+    }
+
+    /// Handle frontmatter and body
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if operation fails
+    fn handle_frontmatter_and_body(
+        &self,
+        frontmatter: FrontMatter,
+        body: &str,
+    ) -> Result<GenResult> {
         let path_to = if let Some(working_dir) = &self.working_dir {
             working_dir.join(frontmatter.to)
         } else {
@@ -245,10 +392,18 @@ impl RRgen {
             self.printer.add_file(&path_to);
         }
         // write main file
-        self.fs.write_file(&path_to, &body)?;
+        self.fs.write_file(&path_to, body)?;
 
         // handle injects
-        if let Some(injections) = frontmatter.injections {
+        self.handle_injects(frontmatter.injections, frontmatter.message.clone())
+    }
+
+    fn handle_injects(
+        &self,
+        injections: Option<Vec<Injection>>,
+        message: Option<String>,
+    ) -> Result<GenResult> {
+        if let Some(injections) = injections {
             for injection in &injections {
                 let injection_to = self.working_dir.as_ref().map_or_else(
                     || PathBuf::from(&injection.into),
@@ -317,8 +472,6 @@ impl RRgen {
                 self.printer.injected(&injection_to);
             }
         }
-        Ok(GenResult::Generated {
-            message: frontmatter.message.clone(),
-        })
+        Ok(GenResult::Generated { message })
     }
 }

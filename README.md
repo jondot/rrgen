@@ -6,7 +6,7 @@ A microframework for declarative code generation and injection.
 
 ## Getting started
 
-Templates use `Tera` as a templating language (similar to liquid), and use a special metadata/body separation with _frontmatter_.
+Templates use `Tera` or `minijinja` as a templating language (similar to liquid), and use a special metadata/body separation with _frontmatter_.
 
 The first part of the template instructs what the template should do, and which `injections` it should perform.
 
@@ -70,3 +70,9 @@ rrgen.generate(
 
 `vars` will be variables that are exposed both for the _frontmatter_ part and the _body_ part.
 
+### Minijinja as alternative template engine
+To use `minijinja` instead of `Tera` as the template engine, you must set dependency of rrgen in Cargo.toml as following:
+
+```rust
+rrgen = { version="X.X.X", default-features = false, features = ["minijinja"] }
+```

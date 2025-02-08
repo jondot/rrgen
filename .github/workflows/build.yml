@@ -52,10 +52,16 @@ jobs:
 
       - uses: Swatinem/rust-cache@v1
 
-      - name: Run cargo test
+      - name: Run cargo test with default feature (ie. tera)
         uses: actions-rs/cargo@v1
         with:
           command: test
+
+      - name: Run cargo test with minijinja feature enabled
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --features minijinja --no-default-features
 
   coverage:
     name: Coverage
