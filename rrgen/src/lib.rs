@@ -272,17 +272,17 @@ impl RRgen {
                 } else if injection.append {
                     format!("{file_content}\n{content}")
                 } else if let Some(before) = &injection.before {
-                    insert_content_at_positions(&file_content, content, injection.inline, before, First, InsertionPoint::Before)
+                    insert_content_at_matches(&file_content, content, injection.inline, before, First, InsertionPoint::Before)
                 } else if let Some(before_last) = &injection.before_last {
-                    insert_content_at_positions(&file_content, content, injection.inline, before_last, Last, InsertionPoint::Before)
+                    insert_content_at_matches(&file_content, content, injection.inline, before_last, Last, InsertionPoint::Before)
                 } else if let Some(before_last) = &injection.before_all {
-                    insert_content_at_positions(&file_content, content, injection.inline, before_last, All, InsertionPoint::Before)
+                    insert_content_at_matches(&file_content, content, injection.inline, before_last, All, InsertionPoint::Before)
                 } else if let Some(after) = &injection.after {
-                    insert_content_at_positions(&file_content, content, injection.inline, after, First, InsertionPoint::After)
+                    insert_content_at_matches(&file_content, content, injection.inline, after, First, InsertionPoint::After)
                 } else if let Some(after_last) = &injection.after_last {
-                    insert_content_at_positions(&file_content, content, injection.inline, after_last, Last, InsertionPoint::After)
+                    insert_content_at_matches(&file_content, content, injection.inline, after_last, Last, InsertionPoint::After)
                 } else if let Some(after_all) = &injection.after_all {
-                    insert_content_at_positions(&file_content, content, injection.inline, after_all, All, InsertionPoint::After)
+                    insert_content_at_matches(&file_content, content, injection.inline, after_all, All, InsertionPoint::After)
                 } else if let Some(remove_lines) = &injection.remove_lines {
                     let lines = file_content
                         .lines()
@@ -318,6 +318,17 @@ enum MatchPositions {
     Last,
 }
 
+/// Finds the positions of lines in the file content that match the provided regex pattern.
+///
+/// # Arguments
+///
+/// * `lines` - A vector of lines from the file content.
+/// * `regex` - The regex pattern to match lines.
+/// * `input` - Specifies whether to match all, first, or last occurrences.
+///
+/// # Returns
+///
+/// A vector of indices representing the positions of the matching lines.
 fn find_positions(lines: Vec<&str>, regex: &Regex, input: &MatchPositions) -> Vec<usize> {
     let matching_positions: Vec<usize> = lines
         .iter()
@@ -337,7 +348,21 @@ enum InsertionPoint {
     After,
 }
 
-fn insert_content_at_positions(
+/// Inserts content at specified positions in the file content based on the provided regex pattern.
+///
+/// # Arguments
+///
+/// * `file_content` - The original content of the file.
+/// * `content` - The content to be inserted.
+/// * `inline` - Whether to insert the content inline or as a new line.
+/// * `regex` - The regex pattern to match positions for insertion.
+/// * `match_positions` - Specifies whether to match all, first, or last occurrences.
+/// * `position` - Specifies whether to insert the content before or after the matched positions.
+///
+/// # Returns
+///
+/// A new string with the content inserted at the specified positions.
+fn insert_content_at_matches(
     file_content: &str,
     content: &str,
     inline: bool,
@@ -361,9 +386,9 @@ fn insert_content_at_positions(
         if regex.is_match(line) && positions.contains(&index) {
             if inline {
                 let new_line = match match_positions {
-                    MatchPositions::All => regex.replace_all(line, replace_with).to_string(),
-                    MatchPositions::First => regex.replace(line, replace_with).to_string(),
-                    MatchPositions::Last => {
+                    All => regex.replace_all(line, replace_with).to_string(),
+                    First => regex.replace(line, replace_with).to_string(),
+                    Last => {
                         let count = regex.find_iter(line).count();
                         regex.replacen(line, count, replace_with).to_string()
                     }
