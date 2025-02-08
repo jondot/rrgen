@@ -1,6 +1,5 @@
 #![allow(non_snake_case)]
 use std::fs;
-
 use fs_extra::{self, dir::CopyOptions};
 use rrgen::RRgen;
 use serde_json::json;

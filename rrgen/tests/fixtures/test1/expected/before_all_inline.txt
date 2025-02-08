@@ -1,0 +1,7 @@
+// Both struct should be injected
+
+pub struct HelloWorld {
+}
+
+pub struct HelloWorld2 {
+}

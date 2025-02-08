@@ -1,0 +1,9 @@
+// Only the second struct should be injected
+
+pub struct World1 {
+  //fields
+}
+
+pub struct HelloWorld2 {
+  //fields
+}

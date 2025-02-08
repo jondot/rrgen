@@ -1,0 +1,9 @@
+// First struct should be injected
+
+pub struct HelloWorld {
+  //fields
+}
+
+pub struct World2 {
+  //fields
+}
