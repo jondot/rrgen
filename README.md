@@ -16,7 +16,6 @@ The second part is the actual target file that's being generated.
 Example template `controller.t`:
 
 ```rust
----
 to: tests/fixtures/realistic/generated/controllers/{{name | snake_case }}.rs
 injections:
 - into: tests/fixtures/realistic/generated/controllers/mod.rs
@@ -69,4 +68,3 @@ rrgen.generate(
 ```
 
 `vars` will be variables that are exposed both for the _frontmatter_ part and the _body_ part.
-
