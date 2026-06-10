@@ -55,7 +55,7 @@ Rendering a template will create one or more files, potentially inject into file
 
 ```rust
 use std::fs;
-use rrgen::Rgen;
+use rrgen::RRgen;
 use serde_json::json;
 
 let rrgen = RRgen::default();
